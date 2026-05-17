@@ -1,0 +1,31 @@
+# AgenticRAG v2.0 — Multi-Agent Vectorless RAG
+# =============================================
+
+# Core (required)
+groq>=0.9.0             # Groq SDK for LLM calls
+pdfplumber>=0.10.0      # PDF text extraction
+python-dotenv>=1.0.0    # .env file support
+
+# Web UI (required for python server.py)
+fastapi>=0.100.0        # Web framework
+uvicorn>=0.23.0         # ASGI server
+python-multipart>=0.0.6 # File upload support
+
+# Optional: Google Cloud Storage backend
+# google-cloud-storage>=2.0.0
+
+# Optional: AWS S3 backend
+# boto3>=1.28.0
+
+# Optional: Neo4j graph backend (production scale)
+# neo4j>=5.0.0
+
+# Optional: Background task processing
+# celery>=5.3.0
+# redis>=5.0.0
+
+# Optional: Accurate token counting
+# tiktoken>=0.7.0
+
+# Optional: Alternative PDF backend
+# PyMuPDF>=1.23.0

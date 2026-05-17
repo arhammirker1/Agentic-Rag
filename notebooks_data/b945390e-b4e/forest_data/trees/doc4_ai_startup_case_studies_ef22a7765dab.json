@@ -1,0 +1,40 @@
+{
+  "source_file": "doc4_ai_startup_case_studies.pdf",
+  "total_pages": 3,
+  "nodes": [
+    {
+      "title": "AI Startup Systems and Case Studies",
+      "text": "",
+      "start_index": 0,
+      "end_index": 2,
+      "nodes": [
+        {
+          "title": "Operational AI Systems",
+          "text": "Modern startups increasingly deploy AI agents in production. Applications include marketing automation, campaign generation, autonomous analytics, customer support systems, and document processing. Organizations combine retrieval systems, graph architectures, tool use, memory layers, and planning frameworks.",
+          "start_index": 0,
+          "end_index": 1,
+          "nodes": [],
+          "node_id": "0002"
+        },
+        {
+          "title": "Autonomous Workflows",
+          "text": "Workflow systems involve chains of execution. Data arrives from APIs, databases, email systems, and user interactions. Agents determine actions through planning and reflection loops. Repeated relationships include retrieval augmented generation, vectorless systems, memory stores, and multimodal interfaces.",
+          "start_index": 1,
+          "end_index": 2,
+          "nodes": [],
+          "node_id": "0003"
+        },
+        {
+          "title": "Future Directions",
+          "text": "Future AI systems may increasingly resemble operating systems rather than chat interfaces. Systems coordinate memory, planning, perception, and action.",
+          "start_index": 2,
+          "end_index": 2,
+          "nodes": [],
+          "node_id": "0004"
+        }
+      ],
+      "node_id": "0001"
+    }
+  ],
+  "document_description": "This document appears to be about artificial intelligence (AI) startup systems and case studies. It seems to be intended for individuals interested in AI and startup ecosystems, possibly entrepreneurs, investors, or researchers. The document likely covers the fundamentals of AI startup systems and presents real-world examples or case studies, as hinted by its title. The scope of the document seems to be introductory or overview in nature, given the brevity of the index."
+}

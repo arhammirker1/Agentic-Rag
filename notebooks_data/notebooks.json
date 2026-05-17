@@ -1,0 +1,35 @@
+[
+  {
+    "id": "b945390e-b4e",
+    "name": "Ai Agents",
+    "created_at": "2026-05-17T15:17:29",
+    "sources": [
+      {
+        "name": "doc1_ai_agent_foundations.pdf",
+        "size": 6884,
+        "added_at": "2026-05-17T15:17:56"
+      },
+      {
+        "name": "doc2_multimodal_computer_use.pdf",
+        "size": 4448,
+        "added_at": "2026-05-17T15:17:56"
+      },
+      {
+        "name": "doc3_vectorless_rag_graphs.pdf",
+        "size": 4236,
+        "added_at": "2026-05-17T15:17:56"
+      },
+      {
+        "name": "doc4_ai_startup_case_studies.pdf",
+        "size": 4233,
+        "added_at": "2026-05-17T15:17:56"
+      },
+      {
+        "name": "Executive Summary (2).pdf",
+        "size": 88842,
+        "added_at": "2026-05-17T15:25:23"
+      }
+    ],
+    "indexed": true
+  }
+]

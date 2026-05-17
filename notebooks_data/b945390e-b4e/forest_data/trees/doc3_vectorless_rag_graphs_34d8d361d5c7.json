@@ -1,0 +1,48 @@
+{
+  "source_file": "doc3_vectorless_rag_graphs.pdf",
+  "total_pages": 3,
+  "nodes": [
+    {
+      "title": "Vectorless Retrieval and Graph Knowledge",
+      "text": "",
+      "start_index": 0,
+      "end_index": 0,
+      "nodes": [],
+      "node_id": "0001"
+    },
+    {
+      "title": "Systems",
+      "text": "",
+      "start_index": 0,
+      "end_index": 2,
+      "nodes": [
+        {
+          "title": "Traditional Retrieval",
+          "text": "Retrieval Augmented Generation traditionally uses vector embeddings. Embeddings map documents into dense representations. Similarity search then identifies related information. However, vector systems sometimes fail when semantic relationships are subtle or when explicit entity relationships matter.",
+          "start_index": 0,
+          "end_index": 1,
+          "nodes": [],
+          "node_id": "0003"
+        },
+        {
+          "title": "Vectorless Graph Retrieval",
+          "text": "Vectorless retrieval introduces entity extraction, graph construction, relationship mapping, and symbolic navigation. Documents become nodes and concepts become edges. Examples include relationships between attention mechanisms, tool use, multimodal systems, AI agents, and memory architectures. Systems can generate relationship trees connecting entities across many documents.",
+          "start_index": 1,
+          "end_index": 2,
+          "nodes": [],
+          "node_id": "0004"
+        },
+        {
+          "title": "Knowledge Graph Patterns",
+          "text": "Graph systems frequently support document exploration. Nodes can represent concepts, companies, people, or technical artifacts. Traversal enables explanation pathways.",
+          "start_index": 2,
+          "end_index": 2,
+          "nodes": [],
+          "node_id": "0005"
+        }
+      ],
+      "node_id": "0002"
+    }
+  ],
+  "document_description": "This document appears to be a technical or academic text focused on vectorless retrieval and graph knowledge. It seems intended for an audience with a background in computer science or a related field, possibly researchers or students. The document covers topics related to vectorless retrieval and graph knowledge, with a main section on systems, suggesting that it may delve into the applications or implementations of these concepts. Overall, the document likely provides an in-depth exploration of these technical subjects."
+}
