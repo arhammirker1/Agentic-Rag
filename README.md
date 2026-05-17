@@ -32,7 +32,7 @@ It works with **Groq Cloud** (free API key) or **local LLMs** via Ollama (100% f
 ## Installation
 
 ```bash
-pip install agenticrag
+pip install agentic-rag-core
 ```
 
 That's it. You're ready to go.
@@ -40,10 +40,10 @@ That's it. You're ready to go.
 **Optional extras:**
 
 ```bash
-pip install agenticrag[web]    # Web UI (includes FastAPI server)
-pip install agenticrag[gcs]    # Google Cloud Storage backend
-pip install agenticrag[neo4j]  # Neo4j graph backend
-pip install agenticrag[all]    # Everything
+pip install agentic-rag-core[web]    # Web UI (includes FastAPI server)
+pip install agentic-rag-core[gcs]    # Google Cloud Storage backend
+pip install agentic-rag-core[neo4j]  # Neo4j graph backend
+pip install agentic-rag-core[all]    # Everything
 ```
 
 > **Note:** If you clone the repo and want to run `server.py`, install with: `pip install -e ".[web]"`
@@ -127,7 +127,7 @@ if __name__ == "__main__":
 
 ```bash
 # Install
-pip install agenticrag flask
+pip install agentic-rag-core flask
 
 # Run
 python app.py
@@ -167,7 +167,7 @@ async def query(q: Question):
 ```
 
 ```bash
-pip install agenticrag fastapi uvicorn
+pip install agentic-rag-core fastapi uvicorn
 uvicorn api:app --reload
 ```
 
@@ -193,7 +193,7 @@ if question:
 ```
 
 ```bash
-pip install agenticrag streamlit
+pip install agentic-rag-core streamlit
 streamlit run chat.py
 ```
 
@@ -226,7 +226,7 @@ for q in questions:
 ```
 
 ```bash
-pip install agenticrag
+pip install agentic-rag-core
 python ask.py
 ```
 
@@ -458,7 +458,7 @@ AgenticRAG includes a beautiful web interface for chatting with your documents:
 
 ```bash
 # Install web dependencies (if not already)
-pip install agenticrag[web]
+pip install agentic-rag-core[web]
 
 # Start the server
 python server.py
@@ -699,7 +699,7 @@ forest = Forest()
 ### Google Cloud Storage
 
 ```bash
-pip install agenticrag[gcs]
+pip install agentic-rag-core[gcs]
 ```
 
 ```python
@@ -717,7 +717,7 @@ forest = Forest(store=store)
 ### Neo4j Graph (Production)
 
 ```bash
-pip install agenticrag[neo4j]
+pip install agentic-rag-core[neo4j]
 ```
 
 ```python

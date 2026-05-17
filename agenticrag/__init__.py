@@ -28,6 +28,12 @@ Multi-document (Forest):
     print(result.confidence)
 """
 
+import os
+from dotenv import load_dotenv
+
+# Automatically load .env file so API keys are discovered without extra code
+load_dotenv()
+
 # ── Core (single document) ───────────────────────────────────────────────
 from .config import PageIndexConfig, ForestConfig, GroqModel, LocalModel
 from .tree_builder import build_tree
@@ -67,6 +73,6 @@ __all__ = [
     "SQLiteGraph",
 ]
 
-__version__ = "2.0.0"
+__version__ = "2.0.1"
 __author__  = "Arham Mirkar"
 __license__ = "MIT"
