@@ -31,7 +31,7 @@ config = PageIndexConfig(
 )
 
 # ── Step 1: Build the tree ─────────────────────────────────────────────────
-print("📑 Building tree index …")
+print("Building tree index ...")
 pages = extract_pages(PDF_PATH)
 tree = build_tree(PDF_PATH, config)
 
@@ -43,7 +43,7 @@ with open("my_document_tree.json", "w") as f:
     json.dump(tree, f, indent=2)
 
 # ── Step 2: Q&A with reasoning-based retrieval ────────────────────────────
-print("\n🔍 Starting Q&A …\n")
+print("\nStarting Q&A ...\n")
 searcher = TreeSearcher(tree, config=config, pages=pages)
 
 questions = [

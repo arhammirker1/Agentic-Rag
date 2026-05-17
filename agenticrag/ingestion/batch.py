@@ -205,12 +205,12 @@ def batch_ingest(
             tree = build_tree(f, config=tree_config)
             if tree.get("nodes"):
                 trees[doc_id] = tree
-                _log(config, f"    [{i}/{len(files)}] ✓ {f.name} → "
+                _log(config, f"    [{i}/{len(files)}] [OK] {f.name} -> "
                      f"{_count_nodes(tree.get('nodes', []))} nodes")
             else:
                 raise RuntimeError("Empty tree (no nodes)")
         except Exception as e:
-            _log(config, f"    [{i}/{len(files)}] ✗ {f.name} → {e}")
+            _log(config, f"    [{i}/{len(files)}] [FAIL] {f.name} -> {e}")
             result.failed += 1
             result.errors.append({"file": f.name, "error": str(e)})
             result.results.append(DocResult(
@@ -258,16 +258,16 @@ def batch_ingest(
             try:
                 did, meta, err = future.result()
                 if err:
-                    _log(config, f"    [{completed}/{len(trees)}] ✗ "
-                         f"{file_map[did].name} metadata → {err}")
+                    _log(config, f"    [{completed}/{len(trees)}] [FAIL] "
+                         f"{file_map[did].name} metadata -> {err}")
                     meta_map[did] = {"title": file_map[did].stem, "topics": [], "entities": []}
                 else:
                     meta_map[did] = meta
-                    _log(config, f"    [{completed}/{len(trees)}] ✓ "
-                         f"{file_map[did].name} → \"{meta.get('title', '?')[:50]}\"")
+                    _log(config, f"    [{completed}/{len(trees)}] [OK] "
+                         f"{file_map[did].name} -> \"{meta.get('title', '?')[:50]}\"")
             except Exception as e:
-                _log(config, f"    [{completed}/{len(trees)}] ✗ "
-                     f"{file_map[doc_id].name} → {e}")
+                _log(config, f"    [{completed}/{len(trees)}] [FAIL] "
+                     f"{file_map[doc_id].name} -> {e}")
                 meta_map[doc_id] = {"title": file_map[doc_id].stem, "topics": [], "entities": []}
 
     _log(config, f"  Phase 3 complete: {len(meta_map)} metadata extracted")

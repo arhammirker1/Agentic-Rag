@@ -117,7 +117,7 @@ class ProgressBar:
         print(
             f"\r[{bar}] {pct:5.1f}%  "
             f"{self.done}/{self.total}  "
-            f"✓{self.ok} ✗{self.errors} ⏭{self.skipped}  "
+            f"ok:{self.ok} err:{self.errors} skip:{self.skipped}  "
             f"{rate:.1f} doc/s  "
             f"elapsed {elapsed_str}  ETA {eta_str}   ",
             end="", flush=True

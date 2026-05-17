@@ -282,17 +282,17 @@ async def chat_endpoint(notebook_id: str, body: ChatRequest):
         # Index all PDFs in sources directory
         pdf_files = list(sources_path.glob("*.pdf"))
         if pdf_files:
-            print(f"\n[server] 📂 Found {len(pdf_files)} PDF(s). Checking indices...", flush=True)
+            print(f"\n[server] Found {len(pdf_files)} PDF(s). Checking indices...", flush=True)
             
         for pdf in pdf_files:
             try:
-                print(f"[server] ⚙️  Indexing '{pdf.name}'... (this might take a minute)", flush=True)
+                print(f"[server] Indexing '{pdf.name}'... (this might take a minute)", flush=True)
                 forest.add(str(pdf))
             except Exception as e:
-                print(f"[server] ❌ Error indexing {pdf.name}: {e}", flush=True)
+                print(f"[server] Error indexing {pdf.name}: {e}", flush=True)
 
         if pdf_files:
-            print("[server] ✅ All sources are now indexed.\n", flush=True)
+            print("[server] All sources are now indexed.\n", flush=True)
 
         # Mark as indexed
         notebooks = _load_notebooks()

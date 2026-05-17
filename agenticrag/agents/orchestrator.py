@@ -412,7 +412,7 @@ class Orchestrator:
                 if hallucinations:
                     _trail_step("Critic", f"Hallucinations found: {len(hallucinations)}")
                     for h in hallucinations:
-                        _trail_step("Critic", f"  ❌ Claim: \"{h.get('claim', '?')}\"")
+                        _trail_step("Critic", f"  [HALLUCINATION] Claim: \"{h.get('claim', '?')}\"")
                         _trail_step("Critic", f"     Reason: {h.get('reason', '?')}")
                 if was_rewritten:
                     _trail_step("Critic", f"Answer was REWRITTEN ({len(final_answer)} chars)")

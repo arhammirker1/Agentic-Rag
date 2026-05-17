@@ -1,18 +1,18 @@
 <p align="center">
-  <h1 align="center">🧠 AgenticRAG</h1>
+  <h1 align="center">AgenticRAG</h1>
   <p align="center"><strong>Vectorless, Reasoning-based RAG for Python</strong></p>
   <p align="center">
-    No Vector DB &nbsp;·&nbsp; No Chunking &nbsp;·&nbsp; No Embeddings<br>
+    No Vector DB &nbsp;&middot;&nbsp; No Chunking &nbsp;&middot;&nbsp; No Embeddings<br>
     Just pure LLM reasoning over your documents.
   </p>
 </p>
 
 <p align="center">
-  <a href="#-installation">Installation</a> &nbsp;·&nbsp;
-  <a href="#-quick-start-30-seconds">Quick Start</a> &nbsp;·&nbsp;
-  <a href="#-web-ui">Web UI</a> &nbsp;·&nbsp;
-  <a href="#-api-reference">API Reference</a> &nbsp;·&nbsp;
-  <a href="#-supported-models">Models</a>
+  <a href="#installation">Installation</a> &nbsp;&middot;&nbsp;
+  <a href="#quick-start-30-seconds">Quick Start</a> &nbsp;&middot;&nbsp;
+  <a href="#web-ui">Web UI</a> &nbsp;&middot;&nbsp;
+  <a href="#api-reference">API Reference</a> &nbsp;&middot;&nbsp;
+  <a href="#supported-models">Models</a>
 </p>
 
 ---
@@ -29,7 +29,7 @@ It works with **Groq Cloud** (free API key) or **local LLMs** via Ollama (100% f
 
 ---
 
-## 📦 Installation
+## Installation
 
 ```bash
 pip install agenticrag
@@ -50,11 +50,11 @@ pip install agenticrag[all]    # Everything
 
 ---
 
-## ⚡ Quick Start (30 seconds)
+## Quick Start (30 seconds)
 
 ### Step 1: Get a free API key
 
-Go to [console.groq.com](https://console.groq.com) → Create an API Key → Copy it.
+Go to [console.groq.com](https://console.groq.com) -- Create an API Key -- Copy it.
 
 ### Step 2: Set your API key
 
@@ -82,17 +82,17 @@ print(result.text)
 
 ---
 
-## 🚀 Use AgenticRAG in Your Own Project
+## Use AgenticRAG in Your Own Project
 
 AgenticRAG is designed to be a **drop-in RAG engine** for any Python project. You don't need to understand how RAG works, build any retrieval pipelines, or set up any infrastructure. Just install, import, and ask questions.
 
 ### How It Works (The Simple Version)
 
 ```
-Your app  →  agenticrag  →  Answer with sources
-             (handles everything:
-              PDF parsing, indexing, multi-agent search,
-              hallucination checking, citations)
+Your app  -->  agenticrag  -->  Answer with sources
+               (handles everything:
+                PDF parsing, indexing, multi-agent search,
+                hallucination checking, citations)
 ```
 
 You write **zero** retrieval code. AgenticRAG handles all of it internally.
@@ -178,7 +178,7 @@ uvicorn api:app --reload
 import streamlit as st
 from agenticrag import Forest
 
-st.title("📄 Chat with your Documents")
+st.title("Chat with your Documents")
 
 # Initialize once
 if "forest" not in st.session_state:
@@ -189,7 +189,7 @@ question = st.text_input("Ask a question:")
 if question:
     result = st.session_state.forest.ask(question)
     st.write(result.text)
-    st.caption(f"Confidence: {result.confidence:.0%} · {result.elapsed_seconds:.1f}s")
+    st.caption(f"Confidence: {result.confidence:.0%} | {result.elapsed_seconds:.1f}s")
 ```
 
 ```bash
@@ -280,7 +280,7 @@ forest = Forest(data_dir="./my_index")
 
 if len(sys.argv) > 2 and sys.argv[1] == "add":
     result = forest.add(sys.argv[2])
-    print(f"✓ Indexed: {result.title} ({result.page_count} pages)")
+    print(f"Indexed: {result.title} ({result.page_count} pages)")
 
 elif len(sys.argv) > 2 and sys.argv[1] == "ask":
     question = " ".join(sys.argv[2:])
@@ -323,7 +323,7 @@ That's it. **Three steps. No RAG architecture knowledge needed.** AgenticRAG han
 
 ---
 
-## 📖 Using AgenticRAG as a Library
+## Using AgenticRAG as a Library
 
 ### Single Document — `PageIndex`
 
@@ -371,7 +371,7 @@ result = forest.ask("Compare revenue growth between 2023 and 2024")
 
 # Rich result object
 print(result.text)               # The answer
-print(result.confidence)         # 0.0–1.0 confidence score
+print(result.confidence)         # 0.0-1.0 confidence score
 print(result.sources)            # Which documents & pages were used
 print(result.documents_searched) # Which doc IDs were searched
 print(result.elapsed_seconds)    # How long it took
@@ -402,7 +402,7 @@ print(result.text)
 
 ### Batch Ingestion (100+ Documents)
 
-For large collections, use the batch pipeline — it's 2–4× faster:
+For large collections, use the batch pipeline — it's 2-4x faster:
 
 ```python
 from agenticrag import Forest, LocalModel
@@ -452,7 +452,7 @@ forest.clear_history()
 
 ---
 
-## 🌐 Web UI
+## Web UI
 
 AgenticRAG includes a beautiful web interface for chatting with your documents:
 
@@ -466,11 +466,11 @@ python server.py
 
 This opens a web app at **http://localhost:8000** where you can:
 
-- 📁 Create **notebooks** to organize your documents
-- 📄 Upload **PDFs** via drag-and-drop
-- 💬 **Chat** with your documents (with source citations)
-- 🔄 Switch between **Groq Cloud** and **local LLM** providers
-- 🌐 Share over **LAN** — anyone on your network can access it
+- Create **notebooks** to organize your documents
+- Upload **PDFs** via drag-and-drop
+- **Chat** with your documents (with source citations)
+- Switch between **Groq Cloud** and **local LLM** providers
+- Share over **LAN** — anyone on your network can access it
 
 ```bash
 # Custom port
@@ -489,12 +489,12 @@ ollama serve
 
 # Machine B (laptop): Point AgenticRAG to Machine A
 python server.py
-# Then in Settings → Local LLM → Base URL: http://MACHINE_A_IP:11434/v1
+# Then in Settings > Local LLM > Base URL: http://MACHINE_A_IP:11434/v1
 ```
 
 ---
 
-## 📚 API Reference
+## API Reference
 
 ### High-Level Classes
 
@@ -569,7 +569,7 @@ forest = Forest(
 
 ---
 
-## 🤖 Supported Models
+## Supported Models
 
 ### Cloud Models (Groq — Free API)
 
@@ -604,90 +604,90 @@ forest = Forest(
 
 | Model | Download Size | VRAM Needed | Best For |
 |-------|-------------|-------------|----------|
-| `LocalModel.QWEN3_4B` | 2.5 GB | ≤ 5 GB | Low-VRAM GPUs, fastest |
-| `LocalModel.QWEN3_8B` | 5.2 GB | ≤ 8 GB | Best quality/size ratio |
-| `LocalModel.QWEN3_14B` | 9.3 GB | ≤ 12 GB | Higher quality |
-| `LocalModel.QWEN3_30B` | 19 GB | ≤ 24 GB | Strong reasoning |
-| `LocalModel.LLAMA3_2_3B` | 2.0 GB | ≤ 4 GB | Ultra-lightweight |
-| `LocalModel.MISTRAL` | 4.1 GB | ≤ 6 GB | General purpose |
-| `LocalModel.GEMMA3_12B` | 8.1 GB | ≤ 12 GB | Alternative mid-range |
+| `LocalModel.QWEN3_4B` | 2.5 GB | 5 GB or less | Low-VRAM GPUs, fastest |
+| `LocalModel.QWEN3_8B` | 5.2 GB | 8 GB or less | Best quality/size ratio |
+| `LocalModel.QWEN3_14B` | 9.3 GB | 12 GB or less | Higher quality |
+| `LocalModel.QWEN3_30B` | 19 GB | 24 GB or less | Strong reasoning |
+| `LocalModel.LLAMA3_2_3B` | 2.0 GB | 4 GB or less | Ultra-lightweight |
+| `LocalModel.MISTRAL` | 4.1 GB | 6 GB or less | General purpose |
+| `LocalModel.GEMMA3_12B` | 8.1 GB | 12 GB or less | Alternative mid-range |
 
 ---
 
-## 🏗️ How It Works
+## How It Works
 
 AgenticRAG uses a **multi-agent pipeline** — like a team of AI researchers working together:
 
 ```
 Your Question
-     │
-     ▼
-┌─────────┐   Looks at the document graph to find
-│ Planner │──▶ which documents might have the answer
-└─────────┘
-     │
-     ▼
-┌─────────┐   Searches those documents IN PARALLEL
-│ Hunters │──▶ using tree-based reasoning (not keywords!)
-└─────────┘
-     │
-     ▼
-┌──────────────┐   Combines evidence from multiple docs
-│ Synthesizer  │──▶ into a single, coherent answer
-└──────────────┘
-     │
-     ▼
-┌────────┐   Checks every claim against the source text
-│ Critic │──▶ removes anything not backed by evidence
-└────────┘
-     │
-     ▼
-  ✅ Verified Answer
+     |
+     v
++---------+   Looks at the document graph to find
+| Planner |-->  which documents might have the answer
++---------+
+     |
+     v
++---------+   Searches those documents IN PARALLEL
+| Hunters |-->  using tree-based reasoning (not keywords!)
++---------+
+     |
+     v
++--------------+   Combines evidence from multiple docs
+| Synthesizer  |-->  into a single, coherent answer
++--------------+
+     |
+     v
++--------+   Checks every claim against the source text
+| Critic |-->  removes anything not backed by evidence
++--------+
+     |
+     v
+  Verified Answer
 ```
 
 This is why AgenticRAG can answer complex questions across many documents — it doesn't just find similar text, it actually **reasons** about what's relevant.
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 agenticrag/
-├── __init__.py              # Public API (Forest, PageIndex, etc.)
-├── __main__.py              # python -m agenticrag entry point
-├── config.py                # GroqModel, LocalModel, configuration
-├── groq_client.py           # LLM wrapper (Groq + OpenAI-compatible)
-├── pdf_parser.py            # PDF/Markdown text extraction
-├── pdf_to_markdown.py       # PDF → Markdown converter (no LLM)
-├── prompts.py               # All LLM prompts
-├── tree_builder.py          # Build hierarchical tree index
-├── tree_search.py           # Single-document tree search
-├── pageindex.py             # PageIndex (single-doc wrapper)
-├── forest.py                # Forest (multi-doc entry point)
-├── agents/
-│   ├── planner.py           # Document selection from graph
-│   ├── hunter.py            # Parallel document searching
-│   ├── synthesizer.py       # Multi-doc answer synthesis
-│   ├── evaluator.py         # Retrieval sufficiency checking
-│   ├── critic.py            # Zero-hallucination enforcer
-│   └── orchestrator.py      # Agentic loop state machine
-├── storage/
-│   ├── base.py              # Abstract TreeStore interface
-│   ├── local.py             # Local filesystem (default)
-│   └── gcs.py               # Google Cloud Storage
-├── graph/
-│   ├── base.py              # Abstract DocumentGraph interface
-│   ├── sqlite_graph.py      # SQLite + FTS5 (default)
-│   └── neo4j_graph.py       # Neo4j (production scale)
-└── ingestion/
-    ├── metadata.py          # LLM metadata extraction
-    ├── pipeline.py          # Single-document ingestion
-    └── batch.py             # Batch ingestion (100K+ docs)
+|-- __init__.py              # Public API (Forest, PageIndex, etc.)
+|-- __main__.py              # python -m agenticrag entry point
+|-- config.py                # GroqModel, LocalModel, configuration
+|-- groq_client.py           # LLM wrapper (Groq + OpenAI-compatible)
+|-- pdf_parser.py            # PDF/Markdown text extraction
+|-- pdf_to_markdown.py       # PDF to Markdown converter (no LLM)
+|-- prompts.py               # All LLM prompts
+|-- tree_builder.py          # Build hierarchical tree index
+|-- tree_search.py           # Single-document tree search
+|-- pageindex.py             # PageIndex (single-doc wrapper)
+|-- forest.py                # Forest (multi-doc entry point)
+|-- agents/
+|   |-- planner.py           # Document selection from graph
+|   |-- hunter.py            # Parallel document searching
+|   |-- synthesizer.py       # Multi-doc answer synthesis
+|   |-- evaluator.py         # Retrieval sufficiency checking
+|   |-- critic.py            # Zero-hallucination enforcer
+|   +-- orchestrator.py      # Agentic loop state machine
+|-- storage/
+|   |-- base.py              # Abstract TreeStore interface
+|   |-- local.py             # Local filesystem (default)
+|   +-- gcs.py               # Google Cloud Storage
+|-- graph/
+|   |-- base.py              # Abstract DocumentGraph interface
+|   |-- sqlite_graph.py      # SQLite + FTS5 (default)
+|   +-- neo4j_graph.py       # Neo4j (production scale)
++-- ingestion/
+    |-- metadata.py          # LLM metadata extraction
+    |-- pipeline.py          # Single-document ingestion
+    +-- batch.py             # Batch ingestion (100K+ docs)
 ```
 
 ---
 
-## 🗄️ Storage Backends
+## Storage Backends
 
 ### Local Filesystem (Default)
 
@@ -734,13 +734,13 @@ forest = Forest(graph=graph)
 
 ---
 
-## 💡 Tips & Best Practices
+## Tips and Best Practices
 
 | Tip | Why |
 |-----|-----|
 | Start with `Forest()` | Works out of the box, zero config |
 | Use `verbose=True` | See exactly what the AI agents are doing |
-| Use batch ingestion for 100+ docs | `forest.add_directory_batch()` is 2–4× faster |
+| Use batch ingestion for 100+ docs | `forest.add_directory_batch()` is 2-4x faster |
 | Set `skip_description=True` in batch | Halves the number of LLM calls |
 | Use `resume=True` in batch | Safely restart interrupted runs |
 | Use `skip_critic=True` for speed | Faster answers (but less hallucination protection) |
@@ -748,20 +748,20 @@ forest = Forest(graph=graph)
 
 ---
 
-## 🔧 Hardware Guide (Local LLMs)
+## Hardware Guide (Local LLMs)
 
 | Setup | GPU | VRAM | Recommended Model | Speed |
 |-------|-----|------|--------------------|-------|
-| **Minimum** | Any NVIDIA (CUDA ≥ 5.0) | 4–5 GB | Qwen3 4B | Good |
-| **Good** | RTX 3060 / Quadro P2000 | 5–12 GB | Qwen3 4B or 8B | Better |
+| **Minimum** | Any NVIDIA (CUDA >= 5.0) | 4-5 GB | Qwen3 4B | Good |
+| **Good** | RTX 3060 / Quadro P2000 | 5-12 GB | Qwen3 4B or 8B | Better |
 | **Recommended** | RTX 4070 Ti | 16 GB | Qwen3 8B or 14B | Fast |
 | **Ideal** | RTX 4090 | 24 GB | Qwen3 30B | Fastest |
 
-> **Note:** AMD GPUs with Polaris/GCN architecture (like RX 580) are **not supported** by Ollama. Only NVIDIA GPUs with CUDA ≥ 5.0 and AMD RDNA (RX 5000+) work.
+> **Note:** AMD GPUs with Polaris/GCN architecture (like RX 580) are **not supported** by Ollama. Only NVIDIA GPUs with CUDA >= 5.0 and AMD RDNA (RX 5000+) work.
 
 ---
 
-## ❓ FAQ
+## FAQ
 
 <details>
 <summary><strong>What file types are supported?</strong></summary>
@@ -780,7 +780,7 @@ PDF, Markdown (.md), and plain text (.txt) files.
 <details>
 <summary><strong>How is this different from LangChain / LlamaIndex?</strong></summary>
 
-Traditional RAG (LangChain, LlamaIndex) splits documents into chunks and uses vector similarity to find relevant pieces. This breaks down on professional documents because **similarity ≠ relevance**.
+Traditional RAG (LangChain, LlamaIndex) splits documents into chunks and uses vector similarity to find relevant pieces. This breaks down on professional documents because **similarity is not the same as relevance**.
 
 AgenticRAG builds a hierarchical tree index and uses LLM reasoning to navigate it — like a human expert flipping through a report. No vectors, no embeddings, no chunking.
 
@@ -791,7 +791,7 @@ AgenticRAG builds a hierarchical tree index and uses LLM reasoning to navigate i
 
 1. Go to [console.groq.com](https://console.groq.com)
 2. Sign up (free)
-3. Go to API Keys → Create API Key
+3. Go to API Keys > Create API Key
 4. Copy the key that starts with `gsk_`
 
 </details>
@@ -805,13 +805,13 @@ AgenticRAG works with any OpenAI-compatible API. Set the `base_url` parameter to
 
 ---
 
-## 📜 License
+## License
 
 MIT — free to use in personal and commercial projects.
 
 ---
 
-## 🙏 Credits
+## Credits
 
 Architecture inspired by [VectifyAI/PageIndex](https://github.com/VectifyAI/PageIndex).
 
