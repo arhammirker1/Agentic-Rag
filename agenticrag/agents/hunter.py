@@ -105,19 +105,6 @@ class HunterAgent:
             chunks = []
             for node in result.retrieved_nodes:
                 text = searcher.get_text(node.get("node_id", ""))
-                # Skip nodes with no meaningful text.  When a tree is built
-                # without add_node_text=True, _get_text() falls back to a
-                # placeholder like "[Pages 55–55]".  Sending these to the
-                # Synthesizer wastes tokens, pollutes evidence, and can
-                # trigger 413 rate-limit errors when many sub-trees run in
-                # parallel and all accumulate empty chunks.  The threshold
-                # of 50 chars is intentionally low — any real content section
-                # will exceed it, while all placeholder strings will not.
-                if not text:
-                    continue
-                stripped = text.strip()
-                if len(stripped) < 50 or stripped.startswith("[Pages "):
-                    continue
                 chunks.append({
                     "doc_id": doc_id,
                     "doc_title": doc_title,
