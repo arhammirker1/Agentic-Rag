@@ -446,7 +446,7 @@ class TreeSearcher:
         """
         Score every indexed node by keyword hit-count using fast case-insensitive
         regex matching across title (weighted 3×), summary (2×), and a text
-        preview (1×, first 600 chars).  Zero LLM calls — pure local search.
+        preview (1×, first 2000 chars).  Zero LLM calls — pure local search.
 
         Scoring rules
         -------------
@@ -456,11 +456,29 @@ class TreeSearcher:
            (exact title phrase match) scores ~20× higher than financial nodes
            that merely contain words like "3m", "list", or "board".
 
-        2. MINIMUM HIT GATE: a node must have at least 2 distinct keyword hits
-           to be included.  Nodes with 0 or 1 hit are excluded entirely.
-           Exception: a node that earned the phrase bonus is always included.
+        2. STEM TITLE BONUS (+10 pts per match): single-word keywords are also
+           matched against each word in the node title after stripping a trailing
+           's' from the keyword (simple depluralisation).  This directly solves
+           the plural/singular mismatch that causes "executives" to miss a node
+           titled "Executive Officers": the stem "executive" matches "Executive"
+           at a word boundary.  The bonus is deliberately high so that a node
+           whose heading is exactly what the user asked for always outranks
+           generic financial nodes that merely mention "board" or "management"
+           in passing.
 
-        3. FINAL SCORE = phrase_bonus + distinct_keyword_hits.
+        3. MINIMUM HIT GATE: a node must have at least 2 distinct keyword hits
+           to be included.  Nodes with 0 or 1 hit are excluded entirely.
+           Exception: a node that earned the phrase bonus OR the stem title bonus
+           is always included regardless of distinct_hits.
+
+        4. TEXT DEPTH: the text preview used for hit-counting is 2000 chars
+           (up from 600).  Many document sections — especially tables like the
+           executive officers list — contain their most specific keywords (CEO,
+           CFO, Chairman, etc.) deep inside the node text, well past the old
+           600-char horizon.  Extending the window to 2000 chars exposes these
+           terms to the scorer at negligible CPU cost (pure string ops).
+
+        5. FINAL SCORE = phrase_bonus + stem_title_bonus + distinct_keyword_hits.
 
         Returns node IDs ranked best-match first.
         """
@@ -473,7 +491,7 @@ class TreeSearcher:
         # Separate multi-word keyphrases (phrase bonus) from full list (hit-counting)
         phrase_kws: List[str] = [kw for kw in unique_kws if len(kw.split()) >= 2]
 
-        # Compile regex patterns for per-keyword hit-counting
+        # Compile regex patterns for per-keyword hit-counting (exact match)
         patterns: List[re.Pattern] = []
         for kw in unique_kws:
             try:
@@ -491,17 +509,70 @@ class TreeSearcher:
             except re.error:
                 pass
 
-        PHRASE_BONUS = 50   # points for exact multi-word phrase in title
-        MIN_KW_HITS  = 2    # minimum distinct keyword hits required (no phrase bonus)
+        # ── Stem patterns for title word matching ─────────────────────────────
+        # For each single-word keyword that ends in 's', build a depluralised
+        # (trailing-s-stripped) word-boundary pattern that is matched ONLY
+        # against the node title.
+        #
+        # Why single-word only: multi-word phrases are already handled by the
+        # phrase bonus above.  Applying stem logic to phrases creates ambiguity.
+        #
+        # Why title only: matching stems against full body text would produce
+        # far too many false positives (e.g. "ceo" matches "reconstituted").
+        # The title is the document author's deliberate label for the section;
+        # a stem match there is a reliable relevance signal.
+        #
+        # Depluralisation rule: strip exactly one trailing 's' when:
+        #   - the keyword is a single word
+        #   - the keyword ends in 's' but NOT 'ss' (to avoid "boss" → "bos")
+        #   - the result is at least 4 characters long
+        #
+        # Examples:
+        #   "executives" → stem "executive" → matches "Executive" in
+        #                  "Executive Officers" ✓
+        #   "directors"  → stem "director"  → matches "Director"  ✓
+        #   "officers"   → stem "officer"   → matches "Officer"   ✓
+        #   "class"      → unchanged (ends in 'ss')                ✓
+        #   "boss"       → unchanged (result "bos" < 4 chars)      ✓
+        stem_title_patterns: List[re.Pattern] = []
+        for kw in unique_kws:
+            # Only process single-word keywords that can be depluralised
+            if ' ' in kw:
+                continue
+            if not kw.endswith('s') or kw.endswith('ss'):
+                continue
+            stem = kw[:-1]
+            if len(stem) < 4:
+                continue
+            if stem == kw:
+                continue  # no change after stripping — skip
+            try:
+                # \b word-boundary prevents "ceo" from matching "reconstituted"
+                stem_title_patterns.append(
+                    re.compile(r'\b' + re.escape(stem) + r'\b', re.IGNORECASE)
+                )
+            except re.error:
+                pass
+
+        PHRASE_BONUS      = 50   # points for exact multi-word phrase in title
+        STEM_TITLE_BONUS  = 10   # points per depluralised keyword matching a title word
+        MIN_KW_HITS       = 2    # minimum distinct keyword hits when no bonus applies
 
         scored: List[Tuple[int, str]] = []
         for nid, node in self._index.items():
             title   = node.get("title", "")
             summary = node.get("summary", "")
-            text    = node.get("text", "")[:600]
+
+            # ── FIX: extend text preview from 600 → 2000 chars ───────────────
+            # Many document sections — especially rich tables like the executive
+            # officers list — only contain their most specific terms (CEO, CFO,
+            # Chairman, board member names, etc.) well past the first 600 chars.
+            # Extending to 2000 chars exposes this signal at negligible cost
+            # because this is pure Python string ops: no LLM, no I/O.
+            text       = node.get("text", "")[:2000]
             searchable = f"{title} {title} {title} {summary} {summary} {text}"
 
-            # Count distinct keyword patterns that match anywhere in the corpus
+            # Count distinct keyword patterns that match anywhere in the searchable corpus
             distinct_hits = sum(1 for pat in patterns if pat.search(searchable))
 
             # Phrase bonus: any multi-word phrase appearing verbatim in the title
@@ -509,11 +580,33 @@ class TreeSearcher:
                 pp.search(title) for pp in phrase_patterns
             ) else 0
 
-            # Inclusion gate: need phrase bonus OR at least MIN_KW_HITS
-            if phrase_bonus == 0 and distinct_hits < MIN_KW_HITS:
+            # ── Stem title bonus ──────────────────────────────────────────────
+            # Check depluralised single-word keywords against the node title.
+            # Each unique stem that matches earns STEM_TITLE_BONUS points.
+            #
+            # Concrete example of what this fixes:
+            #   Query keyword : "executives"
+            #   Stem built    : "executive"
+            #   Node title    : "Executive Officers"
+            #   \b executive \b search on title → MATCH → +10 pts
+            #
+            # Without this bonus, the "Executive Officers" node would score
+            # identically to dozens of financial nodes (both matching only on
+            # generic tokens like "3m" and "list"), causing it to fall below
+            # the top-5 cutoff and be silently discarded.
+            stem_bonus = sum(
+                STEM_TITLE_BONUS
+                for pat in stem_title_patterns
+                if pat.search(title)
+            )
+
+            total_bonus = phrase_bonus + stem_bonus
+
+            # Inclusion gate: include if any bonus earned, OR ≥ MIN_KW_HITS
+            if total_bonus == 0 and distinct_hits < MIN_KW_HITS:
                 continue
 
-            scored.append((phrase_bonus + distinct_hits, nid))
+            scored.append((total_bonus + distinct_hits, nid))
 
         scored.sort(key=lambda x: x[0], reverse=True)
         return [nid for _, nid in scored]
