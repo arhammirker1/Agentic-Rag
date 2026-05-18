@@ -27,6 +27,7 @@ from .prompts import (
     SELECT_NODES,
     SYS_RETRIEVER,
 )
+from .utils.logging import trail
 
 log = logging.getLogger(__name__)
 
@@ -196,23 +197,32 @@ class TreeSearcher:
         )
 
         if use_pre_filter:
-            from .utils.logging import trail
             trail.step(
                 "PRE-FILTER INITIATED",
                 f"Tree size ({len(self._index)} nodes) exceeds threshold ({pre_filter_threshold}).\n"
                 f"Running keyword pre-filtering to build a compact candidate sub-tree.",
                 quiet=self.config.quiet
             )
-            log.debug(
-                f"Pre-filter: {len(self._index)} nodes > threshold "
-                f"{pre_filter_threshold} — expanding keywords"
+            log.info(
+                f"[pre-filter] ACTIVATED — {len(self._index)} nodes "
+                f"(threshold={pre_filter_threshold}). Calling KeywordAgent ..."
             )
             steps.append(
                 f"[pre-filter] Tree has {len(self._index)} nodes — "
                 f"expanding keywords for local candidate search ..."
             )
-            expanded_kws = self._keyword_agent.expand(question, history)
-            matched_ids  = self._local_node_search(expanded_kws)
+
+            doc_context = self.tree.get("document_description", "")
+            expanded_kws = self._keyword_agent.expand(
+                question, history, doc_context=doc_context
+            )
+            matched_ids = self._local_node_search(expanded_kws)
+
+            log.info(
+                f"[pre-filter] KeywordAgent produced {len(expanded_kws)} terms → "
+                f"{len(matched_ids)} matching nodes. "
+                f"Terms: {expanded_kws[:8]}"
+            )
             steps.append(
                 f"[pre-filter] {len(expanded_kws)} terms → "
                 f"{len(matched_ids)} matching nodes"
@@ -221,32 +231,48 @@ class TreeSearcher:
             if matched_ids:
                 candidate_ids     = matched_ids[:max_candidates]
                 candidate_subtree = self._build_candidate_subtree(candidate_ids)
+                log.info(
+                    f"[pre-filter] COMPLETE — built candidate sub-tree with "
+                    f"{len(candidate_ids)} seed nodes + ancestors. "
+                    f"Top seeds: {candidate_ids[:5]}"
+                )
                 steps.append(
                     f"[pre-filter] Candidate sub-tree: "
                     f"top-{len(candidate_ids)} nodes + ancestors"
                 )
-                log.debug(
-                    f"Pre-filter built candidate sub-tree "
-                    f"({len(candidate_ids)} seed nodes)"
-                )
                 trail.step(
                     "PRE-FILTER COMPLETED",
-                    f"Successfully filtered tree of {len(self._index)} nodes down to {len(candidate_ids)} candidate seed nodes.",
-                    {"candidate_seed_ids": candidate_ids, "matched_keywords": expanded_kws},
+                    f"Filtered {len(self._index)} nodes → {len(candidate_ids)} "
+                    f"candidate seed nodes + their ancestors.",
+                    {
+                        "total_tree_nodes": len(self._index),
+                        "candidate_seed_ids": candidate_ids,
+                        "matched_keywords": expanded_kws,
+                    },
                     quiet=self.config.quiet
                 )
                 tree_json = json.dumps(candidate_subtree, indent=2)
             else:
                 # No keyword hits anywhere — fall back to full compact tree
-                log.debug("Pre-filter: zero keyword matches — using full tree")
+                log.warning(
+                    f"[pre-filter] ZERO matches across {len(self._index)} nodes "
+                    f"for terms: {expanded_kws[:10]}. "
+                    f"Falling back to full compact tree — check trail.log for details."
+                )
                 steps.append("[pre-filter] No matches — falling back to full tree")
                 trail.step(
                     "PRE-FILTER COMPLETED (NO MATCHES)",
-                    "Zero keyword matches found. Falling back to the full compact tree.",
+                    f"Zero keyword matches found across {len(self._index)} nodes. "
+                    f"Falling back to the full compact tree.",
+                    {"searched_terms": expanded_kws},
                     quiet=self.config.quiet
                 )
                 tree_json = json.dumps(self._compact_tree(), indent=2)
         else:
+            log.debug(
+                f"[pre-filter] SKIPPED — {len(self._index)} nodes "
+                f"(<= threshold {pre_filter_threshold}) or pre-filtering disabled."
+            )
             tree_json = json.dumps(self._compact_tree(), indent=2)
 
         max_iter = self.config.max_retrieval_iterations

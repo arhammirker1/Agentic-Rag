@@ -169,6 +169,8 @@ verbatim (or near-verbatim) inside a document that answers this question.
 
 Question: "{question}"
 
+{doc_context_block}
+
 {history_block}
 
 Return JSON:
@@ -184,6 +186,8 @@ Rules:
 - "keywords": 5-15 important single words (skip stop-words like "the", "is", "a").
 - "synonyms": 3-8 alternative terms, abbreviations, or domain-specific vocabulary
   for the core concepts in the question.
+- If document context is provided, prioritise vocabulary and terminology that
+  would appear in THAT specific document over generic synonyms.
 - Think about the vocabulary an expert in this field would use.
 - Include both common abbreviations and their expanded forms where relevant.
 """

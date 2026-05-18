@@ -554,6 +554,13 @@ config = ForestConfig(
     max_hunt_workers   = 5,                       # Parallel search threads
     enable_critic      = True,                    # Zero-hallucination checking
     verbose            = True,                    # Print progress
+    # ── Hybrid Sub-Tree Pre-Filtering ──────────────────────────────────
+    # Activates for trees larger than pre_filter_threshold nodes.
+    # One small KeywordAgent LLM call (256 tokens) replaces up to 10
+    # large SELECT_NODES calls (25,000 tokens each) on big documents.
+    enable_pre_filtering = True,   # Toggle the entire pre-filter pipeline
+    pre_filter_threshold = 50,     # Min node count to activate (default: 50)
+    max_filter_candidates = 20,    # Top-N matched seed nodes (default: 20)
 )
 ```
 
@@ -564,6 +571,9 @@ forest = Forest(
     model=GroqModel.GPT_OSS_20B,
     data_dir="./my_data",
     verbose=True,
+    enable_pre_filtering=True,   # default — disable if you want full tree always
+    pre_filter_threshold=50,     # lower = activates on smaller documents
+    max_filter_candidates=20,    # higher = more candidate nodes, larger prompt
 )
 ```
 
@@ -649,8 +659,82 @@ This is why AgenticRAG can answer complex questions across many documents — it
 
 ---
 
-## Project Structure
+## Hybrid Sub-Tree Pre-Filtering
 
+For large documents (SEC 10-K filings, legal contracts, technical manuals), the
+tree index can contain hundreds of nodes. Passing the entire tree into every
+SELECT_NODES call is slow, expensive, and causes the LLM to miss relevant nodes
+(needle-in-a-haystack problem).
+
+AgenticRAG automatically activates **Hybrid Sub-Tree Filtering** when a tree
+exceeds `pre_filter_threshold` nodes:
+User Question
+│
+▼
+KeywordAgent.expand()          — 1 LLM call, 256 tokens max
+• Generates keyphrases, keywords, synonyms
+• Receives document_description so it predicts
+vocabulary specific to THIS document
+│
+▼
+_local_node_search()           — 0 LLM calls, pure Python regex
+• Scores every node: title×3, summary×2, text-preview×1
+• Returns node IDs ranked by hit count
+│
+▼
+_build_candidate_subtree()     — 0 LLM calls
+• Keeps top-N matched nodes + all their ancestors
+• Preserves hierarchical context for the LLM
+│
+▼
+SELECT_NODES loop              — on ~15-node sub-tree, not 1,000-node full tree
+• ~500 tokens per call instead of ~25,000 tokens
+• 98% token reduction on large documents
+
+### Token savings example (3M 2018 10-K, ~160 pages)
+
+| Metric | Without Pre-Filter | With Pre-Filter |
+|--------|-------------------|-----------------|
+| Nodes passed to LLM | ~800 | ~15 |
+| Tokens per SELECT_NODES call | ~20,000 | ~400 |
+| Total tokens (3 iterations) | ~60,000 | ~1,200 |
+| Rate-limit risk | High | Negligible |
+
+### Developer logging
+
+Set `verbose=True` on your `Forest` to see the full pre-filter trace in the
+console. All steps are also written to `pageindex_data/logs/trail.log`:
+
+==================== PRE-FILTER INITIATED ====================
+INFO: Tree size (800 nodes) exceeds threshold (50).
+Running keyword pre-filtering to build a compact candidate sub-tree.
+==================== KEYWORD AGENT (INPUT) ====================
+DATA: { "question": "what distributions do we have?",
+"doc_context_preview": "This document is 3M Company's 2018 Annual Report..." }
+==================== KEYWORD AGENT (SUCCESS) ====================
+DATA: { "expanded_keywords": ["distributions", "dividends paid", "financing activities",
+"treasury stock", "stockholder payouts", ...] }
+==================== PRE-FILTER COMPLETED ====================
+INFO: Filtered 800 nodes → 18 candidate seed nodes + their ancestors.
+DATA: { "candidate_seed_ids": ["0042", "0043", "0089", ...],
+"matched_keywords": ["dividends paid", "financing activities", ...] }
+
+### Configuration reference
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `enable_pre_filtering` | `True` | Toggle the entire pipeline on/off |
+| `pre_filter_threshold` | `50` | Min node count before activation |
+| `max_filter_candidates` | `20` | Max seed nodes passed to sub-tree builder |
+
+**When to tune these:**
+- Slow responses on small documents → raise `pre_filter_threshold` to 100+
+- Missing relevant nodes on huge documents → raise `max_filter_candidates` to 30-40
+- Pre-filter gives zero matches repeatedly → check `trail.log` for the expanded keywords
+
+---
+
+## Project Structure
 ```
 agenticrag/
 |-- __init__.py              # Public API (Forest, PageIndex, etc.)

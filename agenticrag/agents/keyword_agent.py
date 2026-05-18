@@ -28,6 +28,7 @@ from typing import Any, Dict, List, Optional
 
 from ..groq_client import chat_json
 from ..prompts import EXPAND_KEYWORDS
+from ..utils.logging import trail
 
 log = logging.getLogger(__name__)
 
@@ -70,6 +71,7 @@ class KeywordAgent:
         self,
         question: str,
         history: Optional[List[Dict[str, str]]] = None,
+        doc_context: str = "",
     ) -> List[str]:
         """
         Return a flat, deduplicated list of lowercase search terms for
@@ -80,23 +82,37 @@ class KeywordAgent:
 
         Parameters
         ----------
-        question : The user's question.
-        history  : Optional conversation history for additional context.
+        question    : The user's question.
+        history     : Optional conversation history for additional context.
+        doc_context : 2-3 sentence document overview sourced from the tree's
+                      ``document_description`` field.  Passed to the LLM so
+                      it predicts domain-specific vocabulary that actually
+                      appears in this document rather than generic synonyms.
 
         Returns
         -------
         List of lowercase keyword strings, best-expanded terms first.
         """
-        from ..utils.logging import trail
+        history = history or []
 
         trail.step(
             "KEYWORD AGENT (INPUT)",
             f"Expanding keywords for question: '{question}'",
-            {"question": question, "has_history": bool(history)},
-            quiet=self.quiet
+            {
+                "question": question,
+                "doc_context_preview": doc_context[:300] if doc_context else None,
+                "has_history": bool(history),
+            },
+            quiet=self.quiet,
         )
 
-        history = history or []
+        doc_context_block = ""
+        if doc_context:
+            doc_context_block = (
+                "Document context (use this to tailor keywords to this "
+                "document's specific vocabulary and terminology):\n"
+                + doc_context.strip()
+            )
 
         history_block = ""
         if history:
@@ -107,6 +123,7 @@ class KeywordAgent:
 
         prompt = EXPAND_KEYWORDS.format(
             question=question,
+            doc_context_block=doc_context_block,
             history_block=history_block,
         )
 
@@ -129,12 +146,14 @@ class KeywordAgent:
             keywords.extend(w.lower() for w in question.split() if len(w) > 3)
 
             final_keywords = self._deduplicate(keywords)
+
             trail.step(
                 "KEYWORD AGENT (SUCCESS)",
-                f"Expanded search keywords generated successfully.",
+                f"Generated {len(final_keywords)} expanded search terms via LLM.",
                 {"expanded_keywords": final_keywords},
-                quiet=self.quiet
+                quiet=self.quiet,
             )
+            log.info(f"KeywordAgent expanded to {len(final_keywords)} terms: {final_keywords[:10]}")
             return final_keywords
 
         except Exception as e:
@@ -145,10 +164,11 @@ class KeywordAgent:
             fallback_kws = self._local_fallback(question)
             trail.step(
                 "KEYWORD AGENT (FALLBACK)",
-                f"LLM call failed ({e}). Falling back to local heuristic extraction.",
+                f"LLM call failed: {e}. Using local heuristic extraction instead.",
                 {"fallback_keywords": fallback_kws},
-                quiet=self.quiet
+                quiet=self.quiet,
             )
+            log.info(f"KeywordAgent fallback produced {len(fallback_kws)} terms: {fallback_kws}")
             return fallback_kws
 
     # ── Private helpers ───────────────────────────────────────────────────
