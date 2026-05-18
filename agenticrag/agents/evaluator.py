@@ -226,7 +226,7 @@ class EvaluatorAgent:
             doc_title = chunk.get("doc_title", chunk.get("doc_id", "?"))[:60]
             node_title = chunk.get("node_title", "")[:40]
             text = chunk.get("text", "")
-            text_preview = text[:200] + "..." if len(text) > 200 else text
+            text_preview = text[:2000] + "..." if len(text) > 2000 else text
             parts.append(
                 f"[{i}] Doc: \"{doc_title}\" | Section: \"{node_title}\"\n"
                 f"    Preview: {text_preview}"

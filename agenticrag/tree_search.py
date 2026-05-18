@@ -261,6 +261,54 @@ class TreeSearcher:
                     quiet=self.config.quiet
                 )
                 tree_json = json.dumps(candidate_subtree, indent=2)
+
+                # ── Candidate fast-path ───────────────────────────────
+                # If pre-filtering left ≤ SMALL_TREE_THRESHOLD candidate
+                # leaf nodes, read them all immediately — no LLM
+                # SELECT_NODES call needed.  With Fix 1's phrase bonus,
+                # a specific query (e.g. "list executives") typically
+                # narrows to 1–2 nodes here, so this triggers often and
+                # eliminates the entire iterative loop for those cases.
+                candidate_leaf_ids = [
+                    nid for nid in candidate_ids
+                    if not self._index.get(nid, {}).get("nodes")
+                ]
+                if len(candidate_leaf_ids) <= SMALL_TREE_THRESHOLD:
+                    steps.append(
+                        f"[candidate-fast-path] {len(candidate_leaf_ids)} candidate "
+                        f"leaf node(s) ≤ {SMALL_TREE_THRESHOLD} — reading all "
+                        f"immediately, skipping SELECT_NODES."
+                    )
+                    trail.step(
+                        "CANDIDATE FAST-PATH",
+                        f"{len(candidate_leaf_ids)} candidate leaf node(s) — "
+                        f"reading all immediately, no SELECT_NODES call needed.",
+                        {"candidate_leaf_ids": candidate_leaf_ids},
+                        quiet=self.config.quiet,
+                    )
+                    log.info(
+                        f"[candidate-fast-path] Triggered — "
+                        f"{len(candidate_leaf_ids)} leaf node(s), skipping LLM loop."
+                    )
+                    for nid in candidate_leaf_ids:
+                        visited.add(nid)
+                        node = self._index.get(nid)
+                        if node is None:
+                            continue
+                        text = self._get_text(node)
+                        if text and text.strip():
+                            gathered.append((nid, text))
+                            nodes_out.append(node)
+
+                    context = _join_gathered(gathered, with_titles=True, index=self._index)
+                    answer  = self._answer(question, context)
+                    return SearchResult(
+                        text=answer,
+                        retrieved_nodes=nodes_out,
+                        reasoning_steps=steps,
+                        iterations=1,
+                    )
+
             else:
                 # Zero keyword hits across this entire document tree.
                 # The document is irrelevant to this question — skip it
@@ -400,6 +448,20 @@ class TreeSearcher:
         regex matching across title (weighted 3×), summary (2×), and a text
         preview (1×, first 600 chars).  Zero LLM calls — pure local search.
 
+        Scoring rules
+        -------------
+        1. PHRASE BONUS (+50 pts): any multi-word keyword that appears verbatim
+           in the node *title* earns a 50-point bonus.  This overwhelms generic
+           single-keyword overlap so that a node like "Executive Officers"
+           (exact title phrase match) scores ~20× higher than financial nodes
+           that merely contain words like "3m", "list", or "board".
+
+        2. MINIMUM HIT GATE: a node must have at least 2 distinct keyword hits
+           to be included.  Nodes with 0 or 1 hit are excluded entirely.
+           Exception: a node that earned the phrase bonus is always included.
+
+        3. FINAL SCORE = phrase_bonus + distinct_keyword_hits.
+
         Returns node IDs ranked best-match first.
         """
         if not keywords:
@@ -407,6 +469,11 @@ class TreeSearcher:
 
         # De-duplicate while preserving insertion order
         unique_kws = list(dict.fromkeys(keywords))
+
+        # Separate multi-word keyphrases (phrase bonus) from full list (hit-counting)
+        phrase_kws: List[str] = [kw for kw in unique_kws if len(kw.split()) >= 2]
+
+        # Compile regex patterns for per-keyword hit-counting
         patterns: List[re.Pattern] = []
         for kw in unique_kws:
             try:
@@ -416,16 +483,37 @@ class TreeSearcher:
         if not patterns:
             return []
 
+        # Compile phrase patterns for the title-only phrase bonus
+        phrase_patterns: List[re.Pattern] = []
+        for ph in phrase_kws:
+            try:
+                phrase_patterns.append(re.compile(re.escape(ph), re.IGNORECASE))
+            except re.error:
+                pass
+
+        PHRASE_BONUS = 50   # points for exact multi-word phrase in title
+        MIN_KW_HITS  = 2    # minimum distinct keyword hits required (no phrase bonus)
+
         scored: List[Tuple[int, str]] = []
         for nid, node in self._index.items():
             title   = node.get("title", "")
             summary = node.get("summary", "")
             text    = node.get("text", "")[:600]
-            # Title weighted 3×, summary 2×, text preview 1×
             searchable = f"{title} {title} {title} {summary} {summary} {text}"
-            hits = sum(1 for pat in patterns if pat.search(searchable))
-            if hits > 0:
-                scored.append((hits, nid))
+
+            # Count distinct keyword patterns that match anywhere in the corpus
+            distinct_hits = sum(1 for pat in patterns if pat.search(searchable))
+
+            # Phrase bonus: any multi-word phrase appearing verbatim in the title
+            phrase_bonus = PHRASE_BONUS if phrase_patterns and any(
+                pp.search(title) for pp in phrase_patterns
+            ) else 0
+
+            # Inclusion gate: need phrase bonus OR at least MIN_KW_HITS
+            if phrase_bonus == 0 and distinct_hits < MIN_KW_HITS:
+                continue
+
+            scored.append((phrase_bonus + distinct_hits, nid))
 
         scored.sort(key=lambda x: x[0], reverse=True)
         return [nid for _, nid in scored]

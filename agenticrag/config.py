@@ -138,7 +138,7 @@ class PageIndexConfig:
 
     enable_pre_filtering:    bool  = True   # Filter large trees via keyword search before LLM loop
     pre_filter_threshold:    int   = 10     # Min node count to activate pre-filtering
-    max_filter_candidates:   int   = 20     # Top-N matched nodes kept in candidate sub-tree
+    max_filter_candidates:   int   = 5     # Top-N matched nodes kept in candidate sub-tree
 
     temperature:             float = 0.0
     max_output_tokens:       int   = 4096

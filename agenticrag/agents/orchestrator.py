@@ -401,8 +401,36 @@ class Orchestrator:
                     self._log(f"[Round {rnd}] Evidence sufficient, proceeding to Critic.")
                     break
 
-                # Prepare next round
-                effective_question = evaluation.refined_query or question
+                # Prepare next round — validate the refined query before using it.
+                # If the Evaluator's refined query diverges too much from the
+                # original question (fewer than 50% of its significant words
+                # overlap with the original), reject it and fall back to the
+                # original.  This prevents hallucinated constraints like "2024"
+                # or "current" being injected into a query that never asked for them.
+                candidate_refined = evaluation.refined_query or question
+                if candidate_refined and candidate_refined != question:
+                    orig_sig   = {w.lower() for w in question.split()        if len(w) >= 4}
+                    refined_sig = {w.lower() for w in candidate_refined.split() if len(w) >= 4}
+                    if orig_sig and refined_sig:
+                        overlap = len(orig_sig & refined_sig) / max(len(refined_sig), 1)
+                        if overlap < 0.5:
+                            log.info(
+                                f"[Evaluator] Refined query rejected "
+                                f"(overlap={overlap:.0%} < 50%): "
+                                f"'{candidate_refined}' — falling back to original."
+                            )
+                            if verbose:
+                                _trail_step(
+                                    "Evaluator",
+                                    f"Refined query REJECTED (overlap={overlap:.0%} < 50%): "
+                                    f"'{candidate_refined}' → using original question.",
+                                )
+                            trace.append(
+                                f"[Evaluator:R{rnd}] Refined query rejected "
+                                f"(overlap={overlap:.0%}) — using original question."
+                            )
+                            candidate_refined = question
+                effective_question = candidate_refined
                 self._log(
                     f"[Round {rnd}] Need more context. "
                     f"Gaps: {evaluation.gaps}. Refining query ..."
