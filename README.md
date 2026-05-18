@@ -25,7 +25,7 @@ Instead of the traditional RAG approach, AgenticRAG:
 2. **Uses AI agents to reason** over the tree and find the right sections
 3. **Verifies every answer** against the source text — zero hallucinations
 
-It works with **Groq Cloud** (free API key) or **local LLMs** via Ollama (100% free, runs on your machine).
+It works with **Google Gemini**, **Groq Cloud** (free API key) or **local LLMs** via Ollama (100% free, runs on your machine).
 
 ---
 
@@ -659,6 +659,25 @@ This is why AgenticRAG can answer complex questions across many documents — it
 
 ---
 
+## Comparison: AgenticRAG vs. Vector RAG
+
+AgenticRAG is not meant to replace Vector RAG for all use cases. It is designed specifically for **deep research on highly structured documents** (like SEC filings, legal contracts, or technical manuals) where exact facts and numbers matter.
+
+### When to use Vector RAG
+* **Goal**: Finding general semantic themes across millions of documents (e.g., "What is the company's general tone regarding AI?").
+* **Why**: Vector RAG is fast, cheap, and scales to millions of documents instantly. It uses cosine similarity to find semantically related text. 
+* **Weakness**: It blindly chunks documents, often splitting tables or separating numbers from their context. It struggles with exact keyword constraints and is prone to LLM hallucinations when synthesizing answers from disjointed chunks.
+
+### When to use AgenticRAG
+* **Goal**: Targeted, verifiable reasoning on a curated set of complex documents (e.g., "What was the exact amortisation of intangible assets in 2023?").
+* **Why**: 
+  1. **Context Preservation**: It preserves the document's structure as a tree. Financial tables remain intact under their logical headings.
+  2. **Exact Retrieval**: The `KeywordAgent` combined with regex pre-filtering ensures the system hunts for exact strings (like "Operating Margin") rather than mathematically similar concepts.
+  3. **Zero-Hallucination**: The `CriticAgent` strictly cross-references the drafted answer against the raw retrieved text, removing any hallucinated numbers.
+* **Weakness**: It is token-heavy and slow (multiple LLM calls per query). It is not built for high-throughput, low-latency web search over millions of documents.
+
+---
+
 ## Hybrid Sub-Tree Pre-Filtering
 
 For large documents (SEC 10-K filings, legal contracts, technical manuals), the
@@ -678,8 +697,9 @@ vocabulary specific to THIS document
 │
 ▼
 _local_node_search()           — 0 LLM calls, pure Python regex
-• Scores every node: title×3, summary×2, text-preview×1
-• Returns node IDs ranked by hit count
+• Applies Stem Title Bonus (+10 pts) for depluralised keyword matches
+• Scores exact hits across title, summary, and deep text-preview (2000 chars)
+• Returns node IDs ranked by hit count + bonuses
 │
 ▼
 _build_candidate_subtree()     — 0 LLM calls
