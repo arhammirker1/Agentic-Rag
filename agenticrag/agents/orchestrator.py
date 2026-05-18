@@ -52,34 +52,46 @@ log = logging.getLogger(__name__)
 
 # ── Trail logging helpers ─────────────────────────────────────────────────
 
+def _safe_print(text: str) -> None:
+    """Print with graceful fallback for Windows CP1252 command line encoding."""
+    try:
+        print(text)
+    except UnicodeEncodeError:
+        # Fallback to ascii characters for box drawing
+        ascii_text = text.replace("│", "|").replace("├─", "|--").replace("\u2500", "-").replace("─", "-")
+        try:
+            print(ascii_text)
+        except Exception:
+            print(text.encode("ascii", errors="replace").decode("ascii"))
+
 def _trail_header(title: str) -> None:
     """Print a boxed trail header."""
-    print(f"\n{'='*70}")
-    print(f"  >> TRAIL: {title}")
-    print(f"{'='*70}")
+    _safe_print(f"\n{'='*70}")
+    _safe_print(f"  >> TRAIL: {title}")
+    _safe_print(f"{'='*70}")
 
 def _trail_step(agent: str, action: str, detail: str = "") -> None:
     """Print a trail step with agent name."""
     prefix = f"  [{agent}]"
-    print(f"{prefix} {action}")
+    _safe_print(f"{prefix} {action}")
     if detail:
         # Indent detail lines
         for line in detail.split('\n')[:20]:  # cap at 20 lines
-            print(f"  │  {line}")
+            _safe_print(f"  │  {line}")
         if detail.count('\n') > 20:
-            print(f"  │  ... ({detail.count(chr(10)) - 20} more lines)")
+            _safe_print(f"  │  ... ({detail.count(chr(10)) - 20} more lines)")
 
 def _trail_data(label: str, data: str, max_chars: int = 500) -> None:
     """Print a labeled data block (truncated)."""
     preview = data[:max_chars]
     if len(data) > max_chars:
         preview += f"\n  ... [truncated, {len(data)} total chars]"
-    print(f"  ├─ {label}:")
+    _safe_print(f"  ├─ {label}:")
     for line in preview.split('\n'):
-        print(f"  │  {line}")
+        _safe_print(f"  │  {line}")
 
 def _trail_separator() -> None:
-    print(f"  {'─'*60}")
+    _safe_print(f"  {'\u2500'*60}")
 
 
 @dataclass

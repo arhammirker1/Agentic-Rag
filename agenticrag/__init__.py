@@ -75,6 +75,6 @@ __all__ = [
     "SQLiteGraph",
 ]
 
-__version__ = "2.1.2"
+__version__ = "2.1.3"
 __author__  = "Arham Mirkar"
 __license__ = "MIT"

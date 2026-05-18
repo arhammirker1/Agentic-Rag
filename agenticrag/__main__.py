@@ -99,7 +99,7 @@ def _run_serve(host: str, port: int):
     print("=" * 60)
     print(f"  Local:   http://localhost:{port}")
     print(f"  LAN:     http://{lan_ip}:{port}")
-    print("  " + "─" * 54)
+    print("  " + "-" * 54)
     print(f"  Share the LAN URL with devices on your network.\n")
 
     uvicorn.run(app, host=host, port=port, log_level="info")

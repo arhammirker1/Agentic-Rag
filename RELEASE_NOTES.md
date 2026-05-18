@@ -1,13 +1,20 @@
-# Release v2.1.2: CWD-Aware Dotenv Auto-Loading
+# Release v2.1.3: CWD Dotenv Loading & Windows Console Fixes
 
-This patch release fixes a critical issue where the library failed to discover and load API keys (e.g., `GROQ_API_KEY`, `GEMINI_API_KEY`) from the user's project `.env` file when the package was installed from PyPI.
+This patch release resolves two critical Windows/CLI deployment issues when using AgenticRAG:
 
-## 🛠️ Bugfix: CWD-Aware Dotenv Auto-Loading
+## 🛠️ 1. CWD-Aware Dotenv Auto-Loading
 Previously, `load_dotenv()` was called without arguments inside the packaged library's `__init__.py` and `server.py`. In `python-dotenv`, this defaults to searching for `.env` starting from the library's installation folder (deep within `site-packages`) and moving upwards, which completely missed the user's active project directory (CWD).
 
 We have updated the dotenv initialization across all entry points:
 - **CWD Resolution**: Instructed dotenv to start searching starting from the active process's current working directory using `find_dotenv(usecwd=True)`.
 - **Force Override**: Enabled `override=True` so that empty/blank environment variables (commonly set by IDEs or container environments) are properly overridden by values defined in the `.env` file.
+
+## 🛠️ 2. Windows CLI Console Encoding Crash Fix
+Running AgenticRAG on standard Windows command prompts (cmd/PowerShell) using the default non-UTF-8 CP1252 codepage caused complete print crashes with `UnicodeEncodeError` due to Unicode box-drawing characters used in trail logging headers (e.g. `│`, `├─`, `─`).
+
+We introduced a dynamic, fail-safe print wrapper (`_safe_print` in [orchestrator.py](file:///c:/Users/arham/OneDrive/Attachments/Documents/GitHub/Agentic-Rag/agenticrag/agents/orchestrator.py)):
+- **Auto-Detection**: Falls back dynamically to clean ASCII equivalents (like `|`, `|--`, `-`) if the host console does not support Unicode.
+- **CLI Sanitization**: Updated `__main__.py`'s server banner to use fully ASCII-safe line separators.
 
 ## 🛠️ Command to Update
 Users can upgrade to this version by running:
