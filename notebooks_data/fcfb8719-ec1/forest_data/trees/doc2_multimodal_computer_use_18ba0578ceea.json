@@ -1,0 +1,40 @@
+{
+  "source_file": "doc2_multimodal_computer_use.pdf",
+  "total_pages": 3,
+  "nodes": [
+    {
+      "title": "Multimodal Systems and Computer-Use Agents",
+      "text": "",
+      "start_index": 0,
+      "end_index": 2,
+      "nodes": [
+        {
+          "title": "From Text to Action",
+          "text": "Multimodal systems integrate text, image, audio, interface signals, and external actions. Instead of generating text alone, these systems manipulate software environments and computers. Computer-use agents frequently rely on screenshots, cursor position, planning loops, and environmental observations. These systems connect naturally with memory and retrieval systems from earlier discussions.",
+          "start_index": 0,
+          "end_index": 1,
+          "nodes": [],
+          "node_id": "0002"
+        },
+        {
+          "title": "Human Computer Interaction",
+          "text": "Researchers increasingly explore desktop agents capable of controlling keyboards and mice. Systems analyze interfaces and infer intent. Attention mechanisms again play central roles because interfaces contain structured visual information. Repeated entities: transformers, memory systems, planning agents, retrieval pipelines, and tool use.",
+          "start_index": 1,
+          "end_index": 2,
+          "nodes": [],
+          "node_id": "0003"
+        },
+        {
+          "title": "Failure Modes",
+          "text": "Computer-use systems suffer from hallucinated interface states, incorrect assumptions, and unstable planning. Reflection systems attempt to solve these issues through iterative reasoning.",
+          "start_index": 2,
+          "end_index": 2,
+          "nodes": [],
+          "node_id": "0004"
+        }
+      ],
+      "node_id": "0001"
+    }
+  ],
+  "document_description": "This document provides an overview of \""
+}

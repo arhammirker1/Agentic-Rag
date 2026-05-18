@@ -1,0 +1,249 @@
+{
+  "source_file": "transformer_architecture_deep_dive.pdf",
+  "total_pages": 10,
+  "nodes": [
+    {
+      "title": "Transformer Architecture & Attention",
+      "text": "",
+      "start_index": 0,
+      "end_index": 0,
+      "nodes": [],
+      "node_id": "0001"
+    },
+    {
+      "title": "Mechanisms",
+      "text": "",
+      "start_index": 0,
+      "end_index": 9,
+      "nodes": [
+        {
+          "title": "A Deep Technical Reference for Large Language Models",
+          "text": "Version 3.1  |  Research Division  |  NeuralSystems Lab  |  2024\n\n\nAbstract. This document provides a comprehensive technical reference for the Transformer architecture, covering self-attention mechanics, positional encodings, feed-forward sublayers, training dynamics, scaling laws, architectural variants (encoder-only, decoder-only, encoder-decoder), and advanced topics such as Rotary Position Embeddings (RoPE), Grouped-Query Attention (GQA), mixture-of-experts (MoE) routing, and quantization strategies. Each section includes formulas, design rationale, benchmark comparisons, and known failure modes. This reference is intended for practitioners building or evaluating large language model systems. > *Table of Contents*\n\n\n| 1. Foundational Architecture Overview 2                              |\n| -------------------------------------------------------------------- |\n\n| 2. Tokenization &amp; Embedding Layer 2                              |\n| 3. Self-Attention: Scaled Dot-Product 3                              |\n| 4. Multi-Head Attention (MHA) 4                                      |\n| 5. Positional Encodings: Sinusoidal vs. RoPE vs. ALiBi 5             |\n| 6. Feed-Forward Sublayer &amp; Activation Functions 6                |\n| 7. Layer Normalization Variants 7                                    |\n| 8. Encoder-Only, Decoder-Only, and Encoder-Decoder Models 7          |\n| 9. Grouped-Query Attention (GQA) &amp; Multi-Query Attention (MQA) 8 |\n| 10. Mixture of Experts (MoE) 9                                       |\n| 11. Training Dynamics &amp; Scaling Laws 10                          |\n| 12. Inference Optimizations: KV Cache &amp; Quantization 11          |\n| 13. Benchmark Comparison Table 12                                    |\n| 14. Failure Modes &amp; Known Limitations 13                         |",
+          "start_index": 0,
+          "end_index": 1,
+          "nodes": [],
+          "node_id": "0003"
+        },
+        {
+          "title": "1. Foundational Architecture Overview",
+          "text": "The Transformer, introduced by Vaswani et al. (2017) in Attention Is All You Need, eliminated recurrence entirely in  favor  of  attention mechanisms. A  standard  Transformer  block  consists  of  two  sublayers:  (a)  a Multi-Head Self-Attention (MHSA) sublayer and (b) a position-wise Feed-Forward Network (FFN). Each sublayer is wrapped with a residual connection and a normalization step. The original paper used Post-LayerNorm  (Post-LN), where normalization  is applied after  the  residual addition. Modern LLMs predominantly use Pre-LayerNorm  (Pre-LN) because  it produces more stable gradients at  large scale, at the cost of slightly lower peak performance in small-scale settings.",
+          "start_index": 1,
+          "end_index": 1,
+          "nodes": [
+            {
+              "title": "Core equation per Transformer block (Pre-LN):",
+              "text": "h' = x + MHSA(LayerNorm(x)) output = h' + FFN(LayerNorm(h'))\n\n\n| Component           | Role                           | Typical Hyperparameters                 |\n| ------------------- | ------------------------------ | --------------------------------------- |\n\n| Token Embedding     | Map token IDs to dense vectors | vocab_size=32k-128k, d_model=512-8192   |\n| Positional Encoding | Inject position info           | max_seq_len, RoPE base (default 10000)  |\n| Self-Attention      | Model token relationships      | n_heads=8-128, d_head=64-128            |\n| FFN                 | Non-linear transformation      | expansion=4x or 8x d_model, SwiGLU/GELU |\n| Layer Norm          | Stabilize training             | eps=1e-5 or 1e-6, RMSNorm preferred     |\n| Output Head         | Project to vocabulary logits   | weight-tied with embedding (often)      |\n\n\n> *Table 1: Transformer component summary with typical hyperparameters.*",
+              "start_index": 1,
+              "end_index": 1,
+              "nodes": [],
+              "node_id": "0005"
+            }
+          ],
+          "node_id": "0004"
+        },
+        {
+          "title": "2. Tokenization & Embedding Layer",
+          "text": "Modern  LLMs  use  subword  tokenization  algorithms —  primarily  Byte-Pair  Encoding  (BPE)  or  SentencePiece Unigram —  to  balance  vocabulary  coverage  and  sequence  length. The  tokenizer  converts  raw  text  into  a sequence of integer token IDs, each mapped to a learned embedding vector of dimension d_model.",
+          "start_index": 1,
+          "end_index": 2,
+          "nodes": [
+            {
+              "title": "BPE Algorithm (Simplified):",
+              "text": "- 1. Start with character-level vocabulary\n\n- 2. Count all adjacent symbol pairs in training corpus\n\n- 3. Merge the most frequent pair into a single token\n\n- 4. Repeat for N merge operations (N = vocab_size - base_chars)\n\n- 5. The final vocabulary is used at inference time via a greedy tokenization pass The embedding matrix E has shape [vocab_size, d_model]. At inference, it acts as a lookup table. During training the embeddings are updated via backpropagation. Weight  tying — sharing  the embedding matrix with  the  final output projection — reduces parameter count significantly and often  improves perplexity. GPT-2, LLaMA-1, and Mistral all use weight tying. Note: tiktoken (used by GPT-4) uses BPE with byte-level fallback, ensuring that any Unicode string is tokenizable without an <UNK> token. LLaMA-3 expanded its vocabulary from 32,000 (LLaMA-2) to 128,256 tokens to better cover multilingual and code content.",
+              "start_index": 1,
+              "end_index": 2,
+              "nodes": [],
+              "node_id": "0007"
+            }
+          ],
+          "node_id": "0006"
+        },
+        {
+          "title": "3. Self-Attention: Scaled Dot-Product",
+          "text": "Scaled dot-product attention computes, for every query vector, a weighted sum of value vectors, where weights reflect query-key similarity. Given input matrix X of shape [seq_len, d_model], we project to Q, K, V matrices: Q = X W_Q, K = X W_K, V = X W_V Attention(Q, K, V) = softmax( Q K^T / sqrt(d_k) ) V The scaling factor 1/sqrt(d_k) (where d_k is the key dimension, typically 64 or 128) prevents the dot products from growing too large in magnitude, which would push the softmax into regions of near-zero gradient. Without scaling, training with large d_k becomes unstable.",
+          "start_index": 2,
+          "end_index": 2,
+          "nodes": [
+            {
+              "title": "Causal (Decoder) Masking:",
+              "text": "In autoregressive decoders, a lower-triangular mask M is applied before the softmax to prevent each position from attending to future tokens: Attention(Q, K, V) = softmax( (Q K^T / sqrt(d_k)) + M ) V where M[i,j] = 0 if j <= i, else -infinity The computational cost of full self-attention is O(n^2 * d) in time and O(n^2) in memory for a sequence of length n. This  quadratic  scaling  is  the  primary  bottleneck  for  very  long  contexts  and  has  motivated  numerous approximations: sparse attention, linear attention, sliding window attention (Longformer), and state-space models (Mamba). | Variant             | Time Complexity  | Memory         | Supports Causal? | Notes                     |\n| ------------------- | ---------------- | -------------- | ---------------- | ------------------------- |\n\n| Full Attention      | O(n²d)           | O(n²)          | Yes              | Baseline; exact           |\n| Sparse (fixed)      | O(n(cid:214)n·d) | O(n(cid:214)n) | Yes              | BigBird, Longformer       |\n| Linear Attention    | O(nd²)           | O(nd)          | Limited          | Approx.; quality loss     |\n| Flash Attention     | O(n²d)           | O(n)           | Yes              | IO-aware; same math       |\n| Sliding Window      | O(n·w·d)         | O(n·w)         | Yes              | w=window; Mistral         |\n| State Space (Mamba) | O(n·d)           | O(d)           | Yes              | Recurrent; diff. paradigm |\n\n\n> *Table 2: Attention variants — complexity and characteristics.*",
+              "start_index": 2,
+              "end_index": 2,
+              "nodes": [],
+              "node_id": "0009"
+            }
+          ],
+          "node_id": "0008"
+        },
+        {
+          "title": "4. Multi-Head Attention (MHA)",
+          "text": "Rather  than  applying  a  single  attention  function, MHA  runs  h  independent  attention  heads  in  parallel,  each projecting  into a  lower-dimensional subspace of size d_head = d_model  / h. The outputs are concatenated and projected back: MultiHead(Q, K, V) = Concat(head_1, ..., head_h) W_O where head_i = Attention(Q W_Q_i, K W_K_i, V W_V_i) W_Q_i, W_K_i, W_V_i in R^(d_model x d_head) W_O in R^(h*d_head x d_model) Different heads learn to attend to different types of relationships: syntactic dependencies, coreference, positional proximity,  semantic  similarity,  etc. Probing  studies  show  that  heads  in  lower  layers  tend  to  capture  positional patterns while upper-layer heads capture more semantic structure.",
+          "start_index": 2,
+          "end_index": 3,
+          "nodes": [
+            {
+              "title": "Head Ablation Findings (from literature):",
+              "text": "(cid:127) Removing up to 20% of heads in BERT causes < 1% drop in downstream task accuracy. (cid:127) A small number of 'induction heads' (typically in layers 1–4) are critical for in-context learning. (cid:127) Attention sink phenomenon: the first token (often BOS or padding) accumulates a disproportionate share of attention, acting as a 'global sink'. StreamingLLM exploits this. (cid:127) In GPT-style decoders, certain heads specialize in copying recent tokens — these are essential for few-shot prompting.",
+              "start_index": 2,
+              "end_index": 3,
+              "nodes": [],
+              "node_id": "0011"
+            }
+          ],
+          "node_id": "0010"
+        },
+        {
+          "title": "5. Positional Encodings: Sinusoidal vs. RoPE vs. ALiBi",
+          "text": "Attention  is  permutation-invariant  by  default. Positional  encodings  inject  order  information  so  the model  can distinguish 'the cat sat on the mat' from 'the mat sat on the cat'. Three major families exist:",
+          "start_index": 3,
+          "end_index": 4,
+          "nodes": [
+            {
+              "title": "5.1 Sinusoidal (Absolute)",
+              "text": "The original Transformer adds fixed sinusoidal signals to embeddings before the first layer: PE(pos, 2i) = sin(pos / 10000^(2i/d_model)) PE(pos, 2i+1) = cos(pos / 10000^(2i/d_model)) Advantages: no  learned parameters, generalizes  trivially  to any  length. Disadvantages: position  information  is mixed into the residual stream from the start and degrades for sequences beyond the training length.",
+              "start_index": 3,
+              "end_index": 3,
+              "nodes": [],
+              "node_id": "0013"
+            },
+            {
+              "title": "5.2 Rotary Position Embedding (RoPE)",
+              "text": "RoPE (Su et al., 2021), used in LLaMA, Mistral, Falcon, and most modern LLMs, encodes position by rotating query and key vectors before the dot product. For a 2D case: R(theta) = [[cos(theta), -sin(theta)], [sin(theta), cos(theta)]] The dot product of a rotated Q at position m and rotated K at position n depends only on the relative offset (m - n), giving the model a natural relative-position signal without explicit relative attention. RoPE's base frequency (default 10,000 for LLaMA-1/2) can be increased to extend context. LLaMA-3 uses a base of 500,000 and YaRN scaling to support 128K context. Code Llama uses base 1,000,000.",
+              "start_index": 3,
+              "end_index": 3,
+              "nodes": [],
+              "node_id": "0014"
+            },
+            {
+              "title": "5.3 ALiBi (Attention with Linear Biases)",
+              "text": "ALiBi adds a static linear penalty to attention logits proportional to distance, requiring no positional embedding at all: Score(i, j) = Q_i · K_j / sqrt(d_k) - m * |i - j| where m is a per-head scalar slope (set geometrically across heads). ALiBi  extrapolates  well  beyond  training  length  and  is  used  in  MPT  and  BLOOM. However,  it  tends  to underperform RoPE on  tasks requiring  long-range semantic retrieval because  the  linear penalty biases strongly toward local context. | Property              | Sinusoidal | RoPE                  | ALiBi        |\n| --------------------- | ---------- | --------------------- | ------------ |\n\n| Learned params        | No         | No                    | No           |\n| Relative position     | Implicit   | Yes (exact)           | Yes (linear) |\n| Length generalization | Poor       | Medium (with scaling) | Good         |\n\n\n| Integration point      | Input layer          | Per-layer QK           | Per-layer logits |\n| ---------------------- | -------------------- | ---------------------- | ---------------- |\n\n| Used in                | Original Transformer | LLaMA, Mistral, Falcon | MPT, BLOOM       |\n| Extrapolation strategy | N/A                  | YaRN, LongRoPE         | None needed      |\n\n\n> *Table 3: Positional encoding family comparison.*",
+              "start_index": 3,
+              "end_index": 4,
+              "nodes": [],
+              "node_id": "0015"
+            }
+          ],
+          "node_id": "0012"
+        },
+        {
+          "title": "6. Feed-Forward Sublayer & Activation Functions",
+          "text": "Each Transformer  layer  includes a  two-layer MLP applied position-wise. The  intermediate dimension  is  typically 4x d_model (e.g., 4096 for d_model=1024): FFN(x) = activation(x W_1 + b_1) W_2 + b_2 Standard: W_1 in R^(d_model x d_ff), W_2 in R^(d_ff x d_model)",
+          "start_index": 4,
+          "end_index": 4,
+          "nodes": [
+            {
+              "title": "Gated Linear Units (SwiGLU):",
+              "text": "LLaMA and most modern LLMs replace the standard FFN with SwiGLU, which uses three weight matrices and a multiplicative gate: SwiGLU(x) = (x W_gate * SiLU(x W_1)) W_2 SiLU(x) = x\n\n- * sigmoid(x) [also called Swish] To keep total parameter count constant, d_ff is typically reduced to 8/3 * d_model (instead of 4x) when using SwiGLU. SwiGLU outperforms ReLU and GELU on  language modeling benchmarks by 0.5–1.5 perplexity points across model sizes. The smooth, non-monotonic nature of Swish allows gradients  to  flow more uniformly  through  the network during training. | Activation | Formula          | Used In                     | Ppl Advantage vs ReLU |\n| ---------- | ---------------- | --------------------------- | --------------------- |\n\n| ReLU       | max(0, x)        | GPT-2, early BERT           | baseline              |\n| GELU       | x * Phi(x)       | GPT-3, BERT-large           | +0.3-0.5              |\n| SiLU/Swish | x * sigmoid(x)   | Various                     | +0.4-0.7              |\n| SwiGLU     | Swish(xW) * (xV) | LLaMA 1/2/3, Mistral, Gemma | +0.5-1.5              |\n| GeGLU      | GELU(xW) * (xV)  | PaLM, T5-XXL variants       | +0.4-1.2              |\n\n\n> *Table 4: Activation function comparison for FFN sublayers.*",
+              "start_index": 4,
+              "end_index": 4,
+              "nodes": [],
+              "node_id": "0017"
+            }
+          ],
+          "node_id": "0016"
+        },
+        {
+          "title": "7. Layer Normalization Variants",
+          "text": "Layer normalization (LayerNorm) normalizes activations across the feature dimension. Two dominant variants are used in LLMs: LayerNorm: y = gamma * (x - mean(x)) / sqrt(var(x) + eps) + beta RMSNorm: y = gamma * x / sqrt(mean(x^2) + eps) RMSNorm  (Root Mean Square LayerNorm)  removes  the mean-centering step,  reducing computation by ~15% while achieving comparable or superior training stability. It  is used  in LLaMA, Mistral, Falcon, and Gemma. The gamma (gain) parameter is learned; RMSNorm omits the beta (bias) parameter entirely.",
+          "start_index": 4,
+          "end_index": 4,
+          "nodes": [],
+          "node_id": "0018"
+        },
+        {
+          "title": "8. Encoder-Only, Decoder-Only, and Encoder-Decoder Models",
+          "text": "| Architecture    | Attention Type               | Primary Use Cases                              | Examples                    |\n| --------------- | ---------------------------- | ---------------------------------------------- | --------------------------- |\n\n| Encoder-only    | Bidirectional (full)         | Classification, NER, embeddings, semantic s    | eBaErcRhT, RoBERTa, DeBER   |\n| Decoder-only    | Causal (masked)              | Text generation, coding, reasoning, chat       | GPT-4, LLaMA 3, Mistral,    |\n| Encoder-Decoder | Bidirectional + Cross-Attent | ioTnranslation, summarization, QA with long co | ntTe5xt, BART, mT5, Flan-T5 |\n\n\n> *Table 5: Transformer architecture families.*\n\n\nThe decoder-only paradigm has become dominant  for  large-scale general-purpose models. A key reason  is  the simpler pre-training objective  (next-token prediction, or causal  language modeling) which scales effectively and yields emergent few-shot capabilities. Encoder-only models still lead on embedding and discriminative tasks due to bidirectional context access. Encoder-decoder models remain competitive for structured generation tasks.",
+          "start_index": 4,
+          "end_index": 5,
+          "nodes": [],
+          "node_id": "0019"
+        },
+        {
+          "title": "9. Grouped-Query Attention (GQA) & Multi-Query Attention (MQA)",
+          "text": "Standard MHA uses h separate K, V projection matrices  (one per head). Multi-Query Attention  (MQA, Shazeer 2019) uses a single shared K and V across all heads. Grouped-Query Attention (GQA, Ainslie et al. 2023)  is a middle ground: G groups share K and V matrices, where 1 <= G <= h. | MHA: h query heads, h key heads, h value heads fi h KV pairs cached MQA: h query heads, 1 key head, 1 value head fi 1 KV pair cached GQA: h query heads, G key heads, G value heads fi G KV pairs cached Example: LLaMA-3-70B uses h=64 query heads, G=8 key/value heads                                       |\n| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |\n\n| The KV cache at inference stores K and V tensors for all past tokens. Its size is: KV cache bytes = 2 * n_layers * n_kv_heads * d_head * seq_len * bytes_per_param For LLaMA-3-70B (FP16) at 128K context: 2 * 80 * 8 * 128 * 131072 * 2 = ~43 GB vs. MHA equivalent: 2 * 80 * 64 * 128 * 131072 * 2 = ~344 GB |\n\n\nGQA  reduces  KV  cache  size  by  a  factor  of  h/G  with  minimal  quality  degradation. Models  using  GQA: LLaMA-2-70B  (G=8),  LLaMA-3  all  sizes, Mistral-7B  (G=8), Gemma, Falcon-180B. MQA  is  used  in PaLM  and Gemini.",
+          "start_index": 5,
+          "end_index": 5,
+          "nodes": [],
+          "node_id": "0020"
+        },
+        {
+          "title": "10. Mixture of Experts (MoE)",
+          "text": "Mixture-of-Experts models  replace  the dense FFN  in some or all  layers with a set of E expert FFNs, only K of which are activated for each token (K << E, typically K=1 or K=2). A learned router (a small linear layer + softmax) assigns tokens to experts: Router output: g = softmax(x W_router) [shape: E] Top-K selection: select indices i_1..i_K = top_k(g) MoE output: sum_{j=1}^{K} g[i_j] * FFN_i_j(x) Sparse MoE dramatically increases parameter count without proportionally increasing compute: Mixtral 8x7B has ~47B  total  parameters  but  activates  only  ~13B  per  forward  pass. GPT-4  is  widely  believed  to  use  a  MoE architecture (though unconfirmed).",
+          "start_index": 5,
+          "end_index": 7,
+          "nodes": [
+            {
+              "title": "MoE Challenges:",
+              "text": "(cid:127) Load imbalance: without auxiliary losses, the router collapses to always selecting the same few experts (expert collapse). Switch Transformer uses an auxiliary load-balancing loss. (cid:127) Communication overhead: in distributed training, MoE requires all-to-all communication across devices when experts are sharded, adding significant latency. (cid:127) Expert routing granularity: token-level routing (most common) can cause the same concept to be split across experts mid-sentence. Some proposals use sentence-level or segment-level routing. (cid:127) Fine-tuning instability: MoE models can be harder to fine-tune than dense models because gradient updates are sparser and expert specialization can break. | Model         | Experts (E) | Active/token (K) | Total Params | Active Params |\n| ------------- | ----------- | ---------------- | ------------ | ------------- |\n\n| Switch-Base   | 128         | 1                | 7.4B         | ~0.2B         |\n| Mixtral 8x7B  | 8           | 2                | 46.7B        | 12.9B         |\n| Mixtral 8x22B | 8           | 2                | ~141B        | ~39B          |\n| Grok-1 (est.) | 8           | 2                | 314B         | ~86B          |\n| DeepSeek-V2   | 160         | 6                | 236B         | 21B           |\n| DeepSeek-V3   | 256         | 8                | 671B         | 37B           |\n\n\n> *Table 6: Mixture-of-Experts model specifications.*",
+              "start_index": 5,
+              "end_index": 7,
+              "nodes": [],
+              "node_id": "0022"
+            }
+          ],
+          "node_id": "0021"
+        },
+        {
+          "title": "11. Training Dynamics & Scaling Laws",
+          "text": "Kaplan et al. (2020) established that LLM loss follows power-law scaling with model size (N), dataset size (D), and compute budget (C): L(N) ~ (N_c / N)^(alpha_N), alpha_N ~ 0.076 L(D) ~ (D_c / D)^(alpha_D), alpha_D ~ 0.095 L(C) ~ (C_c / C)^(alpha_C), alpha_C ~ 0.050 Optimal allocation: N ~ C^0.73, D ~ C^0.27\n\n- (Kaplan) Chinchilla (Hoffmann 2022): D ~ 20 * N (more data-efficient) The Chinchilla scaling  laws  revised  the Kaplan prescription significantly: GPT-3  (175B params, ~300B  tokens) was undertrained  relative  to compute-optimal;  the same compute budget should  train a ~70B model on ~1.4T tokens. LLaMA-1  was  deliberately  trained  beyond  compute-optimal  to  produce  a  smaller,  inference-efficient model. LLaMA-3 used 15T+ tokens for its 8B model.",
+          "start_index": 7,
+          "end_index": 7,
+          "nodes": [
+            {
+              "title": "Training Stability Techniques:",
+              "text": "(cid:127) Gradient clipping: clip global gradient norm to 1.0 to prevent exploding gradients, especially early in training. (cid:127) Learning rate schedule: linear warmup for 1-2% of total steps, followed by cosine decay to 10% of peak LR. Peak LR ~ 3e-4 for small models, 1e-4 for large. (cid:127) Weight decay: AdamW with weight decay 0.1 applied to all non-embedding, non-normalization parameters. (cid:127) Mixed precision: BF16 (not FP16) is preferred for large models because BF16 has the same exponent range as FP32, preventing overflow without loss scaling. (cid:127) Z-loss regularization (PaLM): adds a small penalty on the log-partition function of the router softmax to prevent logit divergence.",
+              "start_index": 7,
+              "end_index": 7,
+              "nodes": [],
+              "node_id": "0024"
+            }
+          ],
+          "node_id": "0023"
+        },
+        {
+          "title": "12. Inference Optimizations: KV Cache & Quantization",
+          "text": "",
+          "start_index": 7,
+          "end_index": 8,
+          "nodes": [
+            {
+              "title": "KV Cache:",
+              "text": "During autoregressive generation, the K and V tensors for all past tokens are cached and reused. Only the new token's Q, K, V are computed at each step, reducing computation from O(n^2) to O(n) per step (at the cost of O(n) memory  per  layer). Paged  KV  cache  (vLLM's  PagedAttention) manages  cache memory  in  fixed-size  blocks, enabling high GPU utilization for variable-length batches.",
+              "start_index": 7,
+              "end_index": 7,
+              "nodes": [],
+              "node_id": "0026"
+            },
+            {
+              "title": "Quantization Strategies:",
+              "text": "Quantization reduces the bit-width of weights and/or activations to save memory and  increase throughput at the cost of some accuracy. | Method          | Weights     | Activations | Speedup | Quality Loss    | Notes                    |\n| --------------- | ----------- | ----------- | ------- | --------------- | ------------------------ |\n\n| FP16/BF16       | 16-bit      | 16-bit      | 1x      | None (baseline) | Default training dtype   |\n| INT8 (LLM.int8) | 8-bit       | 16-bit      | ~1.5x   | < 0.1%          | Mixed decomposition      |\n| GPTQ            | 4-bit       | 16-bit      | ~2.5x   | ~0.5-1%         | Post-training, per-layer |\n| AWQ             | 4-bit       | 16-bit      | ~2.5x   | ~0.3-0.8%       | Activation-aware         |\n| GGUF Q4_K_M     | 4-bit mixed | 32-bit      | ~3x     | ~0.7%           | llama.cpp default        |\n| FP8 (H100)      | 8-bit float | 8-bit float | ~2x     | < 0.2%          | Hardware native          |\n\n\n| INT4 + INT8 act | 4-bit | 8-bit | ~3.5x | ~1-2% | SmoothQuant variant |\n| --------------- | ----- | ----- | ----- | ----- | ------------------- |\n\n\n> *Table 7: Quantization methods for LLM inference.*",
+              "start_index": 7,
+              "end_index": 8,
+              "nodes": [],
+              "node_id": "0027"
+            }
+          ],
+          "node_id": "0025"
+        },
+        {
+          "title": "13. Benchmark Comparison Table",
+          "text": "The  following  table  summarizes  architectural  choices  and  reported  benchmark  scores  for  major  open  and proprietary LLMs. Scores are  from official  reports or  the Open LLM Leaderboard  (as of early 2024). MMLU = Massive  Multitask  Language  Understanding  (5-shot);  HumanEval  =  code  generation  (pass@1);  GSM8K  = grade-school math (8-shot CoT). | Model        | Params   | Attn   | PosEnc  | Norm    | Act    | Context | MMLU | HumanEval | GSM8K |\n| ------------ | -------- | ------ | ------- | ------- | ------ | ------- | ---- | --------- | ----- |\n\n| GPT-3        | 175B     | MHA    | Learned | Post-LN | GELU   | 2K      | 43.9 | —         | —     |\n| PaLM         | 540B     | MQA    | RoPE    | Pre-LN  | SwiGLU | 2K      | 69.3 | 26.2      | 56.5  |\n| LLaMA-1 65B  | 65B      | MHA    | RoPE    | RMSNorm | SwiGLU | 2K      | 63.4 | 23.7      | 50.9  |\n| LLaMA-2 70B  | 70B      | GQA(8) | RoPE    | RMSNorm | SwiGLU | 4K      | 68.9 | 29.9      | 57.5  |\n| Mistral-7B   | 7.3B     | GQA(8) | RoPE    | RMSNorm | SwiGLU | 32K     | 60.1 | 30.5      | 52.1  |\n| Mixtral 8x7B | 46.7B    | GQA(8) | RoPE    | RMSNorm | SwiGLU | 32K     | 70.6 | 40.2      | 74.4  |\n| LLaMA-3 70B  | 70B      | GQA(8) | RoPE    | RMSNorm | SwiGLU | 128K    | 82.0 | 72.6      | 93.0  |\n| Gemma-2 27B  | 27B      | GQA(2) | RoPE    | RMSNorm | GeGLU  | 8K      | 75.2 | 51.8      | 74.0  |\n| DeepSeek-V3  | 671B MoE | MLA    | RoPE    | RMSNorm | SwiGLU | 128K    | 88.5 | 65.2      | 89.3  |\n\n\n> *Table 8: Architectural choices and benchmark scores for key LLMs. MLA = Multi-head Latent Attention (DeepSeek's low-rank*\n\n\nKV compression variant).",
+          "start_index": 8,
+          "end_index": 8,
+          "nodes": [],
+          "node_id": "0028"
+        },
+        {
+          "title": "14. Failure Modes & Known Limitations",
+          "text": "Despite  impressive  capabilities,  Transformer  LLMs  exhibit  systematic  failure  modes  that  are  important  to understand when building applications: Hallucination: Models generate fluent but factually incorrect text. Root causes include spurious memorization of co-occurring tokens and inability to distinguish 'what I have seen' from 'what is true'. Retrieval-Augmented Generation (RAG) partially mitigates this. Lost-in-the-Middle: Liu et al. (2023) showed that LLMs perform best when relevant information is at the beginning or end of a long context, and significantly worse when it is in the middle — even within the nominal context window. Attention Sink & Long-Context Degradation: Beyond fine-tuned context lengths, RoPE-based models assign high attention scores to position 0 (sink token) and fail to meaningfully attend to distant tokens. StreamingLLM and positional interpolation techniques address this. Reversal Curse: Berglund et al. (2023) showed that a model trained on 'A is B' fails to infer 'B is A', indicating that causal LMs learn directional associations rather than symmetric factual relationships. Repetition Collapse: Without repetition penalties, greedy and beam-search decoding can collapse into degenerate loops. Temperature sampling, top-p, and frequency penalties are standard mitigations. The nucleus (top-p) technique discards low-probability tokens to maintain diversity without sacrificing coherence. Sensitivity to Prompt Format: Minor reformulations of the same question can lead to vastly different answers — a form of brittleness not seen in human reasoning. Chain-of-Thought prompting significantly improves reasoning robustness. Tokenization Artifacts: Arithmetic on numbers is unreliable because digits are tokenized inconsistently (e.g., '1234' may be one token while '1235' is two). This creates systematic biases in numeric tasks. Document end. This reference covers foundational and advanced Transformer topics as of 2024. Topics not covered here include RLHF/RLAIF alignment training, speculative decoding, model merging techniques, continuous batching, and multi-modal extensions.",
+          "start_index": 8,
+          "end_index": 9,
+          "nodes": [],
+          "node_id": "0029"
+        }
+      ],
+      "node_id": "0002"
+    }
+  ],
+  "document_description": "This document provides an overview of transformer architecture and the attention mechanisms that power modern deep learning models. It is aimed at machine learning practitioners, researchers, and advanced students who want to understand how transformers work under the hood. The main sections cover the core transformer design, the role of self‑attention, and the various mechanisms that enable efficient sequence modeling."
+}
