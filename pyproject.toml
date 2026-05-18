@@ -69,10 +69,10 @@ dev = [
 agenticrag = "agenticrag.__main__:main"
 
 [project.urls]
-Homepage = "https://github.com/AjayVirkar/agenticrag"
-Documentation = "https://github.com/AjayVirkar/agenticrag#readme"
-Repository = "https://github.com/AjayVirkar/agenticrag"
-Issues = "https://github.com/AjayVirkar/agenticrag/issues"
+Homepage = "https://github.com/arhammirker1/agenticrag"
+Documentation = "https://github.com/arhammirker1/agenticrag#readme"
+Repository = "https://github.com/arhammirker1/agenticrag"
+Issues = "https://github.com/arhammirker1/agenticrag/issues"
 
 [tool.setuptools.packages.find]
 include = ["agenticrag*"]

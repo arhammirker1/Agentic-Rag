@@ -928,4 +928,4 @@ MIT — free to use in personal and commercial projects.
 
 Architecture inspired by [VectifyAI/PageIndex](https://github.com/VectifyAI/PageIndex).
 
-Built by [Arham Mirkar](https://github.com/AjayVirkar).
+Built by [Arham Mirkar](https://github.com/arhammirkar1).
