@@ -64,6 +64,9 @@ Create a `.env` file in your project folder:
 GROQ_API_KEY=gsk_your_key_here
 ```
 
+> [!NOTE]
+> **Using the Web UI?** If you are running the browser-based Web UI, creating a `.env` file is entirely optional! You can set your API keys directly inside the interface's settings panel.
+
 ### Step 3: Ask questions about any PDF
 
 ```python
@@ -489,6 +492,10 @@ This opens a web app at **http://localhost:8000** where you can:
 - Switch between **Groq Cloud**, **Gemini**, and **local LLM** providers
 - Share over **LAN** — anyone on your network can access it
 
+> [!TIP]
+> **No `.env` file required!**
+> You can spin up the Web UI server immediately without creating a `.env` file or configuring system environment variables. Once the Web UI is running, simply click on the **Settings** panel in the top bar to choose your provider, enter your API key, or specify your local LLM's connection endpoint (e.g., Ollama). All settings are saved locally to your workspace.
+
 ### Split Architecture (GPU on one machine, UI on another)
 
 ```bash
@@ -913,6 +920,13 @@ AgenticRAG builds a hierarchical tree index and uses LLM reasoning to navigate i
 <summary><strong>Can I use OpenAI / Anthropic / other providers?</strong></summary>
 
 AgenticRAG works with any OpenAI-compatible API. Set the `base_url` parameter to point to your provider's endpoint.
+
+</details>
+
+<details>
+<summary><strong>Do I need a `.env` file to run the Web UI?</strong></summary>
+
+**No.** The `.env` file is completely optional for the Web UI. If you start the server using `python -m agenticrag serve` without a `.env` file, the server will start up normally. You can configure your API keys (for Groq or Gemini) or local LLM connection settings directly from the **Settings** panel in the browser. These will be saved locally to your workspace.
 
 </details>
 
