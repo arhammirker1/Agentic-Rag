@@ -118,3 +118,105 @@ def extract_metadata(
             "entities": [],
             "doc_type_hint": "other",
         }
+
+
+# ── Sub-tree metadata (local, no LLM) ────────────────────────────────────
+
+def extract_subtree_metadata(
+    nodes: list,
+    parent_title: str = "",
+    source_file: str = "",
+) -> Dict[str, Any]:
+    """
+    Extract metadata for a sub-tree locally (no LLM call).
+
+    Uses the node titles and text content to build a rich summary
+    and topic list.  This is fast and doesn't hit rate limits.
+
+    Parameters
+    ----------
+    nodes       : The sub-tree's node list.
+    parent_title: Title of the parent document.
+    source_file : Original filename.
+
+    Returns
+    -------
+    Dict with title, summary, topics, entities.
+    """
+    # Collect all titles and text from the sub-tree
+    titles: List[str] = []
+    all_text: List[str] = []
+    _collect_content(nodes, titles, all_text)
+
+    # Build title from section headings
+    if len(titles) == 1:
+        title = titles[0]
+    elif len(titles) <= 3:
+        title = " | ".join(titles[:3])
+    else:
+        title = f"{titles[0]} ... {titles[-1]} ({len(titles)} sections)"
+
+    if parent_title:
+        title = f"{parent_title} — {title}"
+
+    # Build summary from first ~500 chars of combined text
+    combined_text = " ".join(all_text)
+    summary_text = combined_text[:500].strip()
+    if len(combined_text) > 500:
+        dot = summary_text.rfind(".")
+        if dot > 200:
+            summary_text = summary_text[:dot + 1]
+        else:
+            summary_text += "..."
+
+    summary = f"Sections: {', '.join(titles[:8])}. {summary_text}"
+
+    # Extract topics from titles
+    topics = _extract_topics_from_titles(titles)
+
+    return {
+        "title": title,
+        "summary": summary,
+        "topics": topics,
+        "entities": [],
+        "doc_type_hint": "section",
+    }
+
+
+def _collect_content(
+    nodes: list,
+    titles: List[str],
+    texts: List[str],
+) -> None:
+    """Recursively collect titles and text snippets from nodes."""
+    for n in nodes:
+        t = n.get("title", "").strip()
+        if t:
+            titles.append(t)
+        text = n.get("text", "").strip()
+        if text:
+            texts.append(text[:200])
+        if n.get("nodes"):
+            _collect_content(n["nodes"], titles, texts)
+
+
+def _extract_topics_from_titles(titles: list) -> List[str]:
+    """Extract topic keywords from section titles."""
+    stop = {
+        "the", "a", "an", "of", "in", "to", "for", "and", "or", "is",
+        "are", "was", "were", "be", "been", "being", "have", "has", "had",
+        "do", "does", "did", "will", "would", "could", "should", "may",
+        "might", "shall", "can", "with", "at", "by", "from", "on", "not",
+        "no", "but", "if", "then", "than", "too", "very", "just", "about",
+        "this", "that", "these", "those", "it", "its", "our", "we", "us",
+        "page", "part", "item", "section", "general", "content",
+    }
+    words: Dict[str, int] = {}
+    for title in titles:
+        for word in title.split():
+            clean = word.strip(".,;:()[]{}\"'").lower()
+            if len(clean) > 2 and clean not in stop:
+                words[clean] = words.get(clean, 0) + 1
+
+    sorted_words = sorted(words.items(), key=lambda x: x[1], reverse=True)
+    return [w for w, _ in sorted_words[:10]]

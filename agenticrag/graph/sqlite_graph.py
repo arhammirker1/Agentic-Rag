@@ -43,15 +43,16 @@ class SQLiteGraph(DocumentGraph):
     def _create_tables(self) -> None:
         self._conn.executescript("""
             CREATE TABLE IF NOT EXISTS documents (
-                doc_id      TEXT PRIMARY KEY,
-                file_name   TEXT NOT NULL,
-                title       TEXT DEFAULT '',
-                summary     TEXT DEFAULT '',
-                topics      TEXT DEFAULT '[]',
-                entities    TEXT DEFAULT '[]',
-                doc_type    TEXT DEFAULT 'pdf',
-                page_count  INTEGER DEFAULT 0,
-                extra       TEXT DEFAULT '{}'
+                doc_id          TEXT PRIMARY KEY,
+                file_name       TEXT NOT NULL,
+                title           TEXT DEFAULT '',
+                summary         TEXT DEFAULT '',
+                topics          TEXT DEFAULT '[]',
+                entities        TEXT DEFAULT '[]',
+                doc_type        TEXT DEFAULT 'pdf',
+                page_count      INTEGER DEFAULT 0,
+                parent_doc_id   TEXT DEFAULT NULL,
+                extra           TEXT DEFAULT '{}'
             );
 
             CREATE TABLE IF NOT EXISTS edges (
@@ -67,6 +68,7 @@ class SQLiteGraph(DocumentGraph):
             CREATE INDEX IF NOT EXISTS idx_topics ON documents(topics);
             CREATE INDEX IF NOT EXISTS idx_edges_source ON edges(source_id);
             CREATE INDEX IF NOT EXISTS idx_edges_target ON edges(target_id);
+            CREATE INDEX IF NOT EXISTS idx_parent ON documents(parent_doc_id);
         """)
         # Enable FTS5 for full-text search (built into SQLite)
         self._conn.execute("""
@@ -78,10 +80,23 @@ class SQLiteGraph(DocumentGraph):
         """)
         self._conn.commit()
 
+        # Auto-migration: add parent_doc_id column if upgrading from older schema
+        self._migrate()
+
     def _rebuild_fts(self) -> None:
         """Rebuild the FTS index after inserts/updates."""
         self._conn.execute("INSERT INTO documents_fts(documents_fts) VALUES('rebuild')")
         self._conn.commit()
+
+    def _migrate(self) -> None:
+        """Add columns that may be missing in older databases."""
+        cursor = self._conn.execute("PRAGMA table_info(documents)")
+        columns = {row[1] for row in cursor.fetchall()}
+        if "parent_doc_id" not in columns:
+            self._conn.execute(
+                "ALTER TABLE documents ADD COLUMN parent_doc_id TEXT DEFAULT NULL"
+            )
+            self._conn.commit()
 
     # ── Node operations ──────────────────────────────────────────────────
 
@@ -89,8 +104,9 @@ class SQLiteGraph(DocumentGraph):
         self._conn.execute(
             """
             INSERT OR REPLACE INTO documents
-                (doc_id, file_name, title, summary, topics, entities, doc_type, page_count, extra)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (doc_id, file_name, title, summary, topics, entities,
+                 doc_type, page_count, parent_doc_id, extra)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 node.doc_id,
@@ -101,6 +117,7 @@ class SQLiteGraph(DocumentGraph):
                 json.dumps(node.entities),
                 node.doc_type,
                 node.page_count,
+                node.parent_doc_id,
                 json.dumps(node.extra),
             ),
         )
@@ -114,6 +131,13 @@ class SQLiteGraph(DocumentGraph):
         return self._row_to_node(row) if row else None
 
     def remove_document(self, doc_id: str) -> None:
+        # Cascade: also remove sub-trees (children) of this document
+        children = self._conn.execute(
+            "SELECT doc_id FROM documents WHERE parent_doc_id = ?", (doc_id,)
+        ).fetchall()
+        for child in children:
+            self.remove_document(child["doc_id"])
+
         self._conn.execute("DELETE FROM documents WHERE doc_id = ?", (doc_id,))
         self._conn.execute(
             "DELETE FROM edges WHERE source_id = ? OR target_id = ?",
@@ -256,8 +280,17 @@ class SQLiteGraph(DocumentGraph):
             entities=json.loads(row["entities"]),
             doc_type=row["doc_type"],
             page_count=row["page_count"],
+            parent_doc_id=row["parent_doc_id"] if "parent_doc_id" in row.keys() else None,
             extra=json.loads(row["extra"]),
         )
+
+    def get_children(self, parent_doc_id: str) -> List[DocNode]:
+        """Return all sub-tree documents that belong to a parent document."""
+        rows = self._conn.execute(
+            "SELECT * FROM documents WHERE parent_doc_id = ?",
+            (parent_doc_id,),
+        ).fetchall()
+        return [self._row_to_node(r) for r in rows]
 
     def close(self) -> None:
         """Close the database connection."""

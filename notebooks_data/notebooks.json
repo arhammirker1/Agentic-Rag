@@ -1,33 +1,54 @@
 [
   {
-    "id": "b945390e-b4e",
-    "name": "Ai Agents",
-    "created_at": "2026-05-17T15:17:29",
+    "id": "fcfb8719-ec1",
+    "name": "Ai agents",
+    "created_at": "2026-05-17T22:36:37",
     "sources": [
       {
         "name": "doc1_ai_agent_foundations.pdf",
         "size": 6884,
-        "added_at": "2026-05-17T15:17:56"
+        "added_at": "2026-05-17T22:36:41"
       },
       {
         "name": "doc2_multimodal_computer_use.pdf",
         "size": 4448,
-        "added_at": "2026-05-17T15:17:56"
+        "added_at": "2026-05-17T22:36:41"
       },
       {
         "name": "doc3_vectorless_rag_graphs.pdf",
         "size": 4236,
-        "added_at": "2026-05-17T15:17:56"
+        "added_at": "2026-05-17T22:36:41"
       },
       {
         "name": "doc4_ai_startup_case_studies.pdf",
         "size": 4233,
-        "added_at": "2026-05-17T15:17:56"
-      },
+        "added_at": "2026-05-17T22:36:42"
+      }
+    ],
+    "indexed": true
+  },
+  {
+    "id": "6d87da49-f46",
+    "name": "SSc",
+    "created_at": "2026-05-17T23:12:13",
+    "sources": [
       {
-        "name": "Executive Summary (2).pdf",
-        "size": 88842,
-        "added_at": "2026-05-17T15:25:23"
+        "name": "3M_2018_10K.pdf",
+        "size": 1252586,
+        "added_at": "2026-05-17T23:12:36"
+      }
+    ],
+    "indexed": true
+  },
+  {
+    "id": "8632b7d3-e1b",
+    "name": "Transformers",
+    "created_at": "2026-05-18T00:17:26",
+    "sources": [
+      {
+        "name": "transformer_architecture_deep_dive.pdf",
+        "size": 29038,
+        "added_at": "2026-05-18T00:17:45"
       }
     ],
     "indexed": true

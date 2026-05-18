@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: agenticrag
-Version: 2.0.0
+Version: 2.0.1
 Summary: Vectorless, Reasoning-based RAG — multi-document agentic retrieval with zero hallucination
 Author-email: Arham Mirkar <arhammirker1@gmail.com>
 License: MIT

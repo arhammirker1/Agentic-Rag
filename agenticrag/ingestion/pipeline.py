@@ -23,7 +23,8 @@ from ..graph.base import DocNode, DocumentGraph
 from ..pdf_parser import extract_pages
 from ..storage.base import TreeStore
 from ..tree_builder import build_tree
-from .metadata import extract_metadata
+from ..tree_splitter import should_split, split_tree
+from .metadata import extract_metadata, extract_subtree_metadata
 
 log = logging.getLogger(__name__)
 
@@ -129,18 +130,35 @@ def ingest_document(
         # 2. Build tree
         _log(config, f"Building tree index ({len(pages)} pages) ...")
         tree = build_tree(file_path, config=config)
-        
+
         if not tree.get("nodes") and not tree.get("document_description"):
             raise RuntimeError("Tree building failed completely (likely due to LLM rate limits).")
 
-        # 3. Extract metadata
+        # 3. Extract metadata for the parent document
         _log(config, "Extracting metadata ...")
         meta = extract_metadata(pages, model=config.model, api_key=config.api_key, base_url=config.base_url, quiet=config.quiet)
 
-        # 4. Save tree
+        # 4. Check if tree needs splitting
+        if should_split(tree):
+            _log(config, f"Tree is oversized — splitting into sub-trees ...")
+            return _ingest_split(
+                tree=tree,
+                doc_id=doc_id,
+                file_path=file_path,
+                pages=pages,
+                meta=meta,
+                config=config,
+                store=store,
+                graph=graph,
+            )
+
+        # 5. Strip internal fields before saving
+        tree.pop("_markdown", None)
+
+        # 6. Save tree
         store.save(doc_id, tree)
 
-        # 5. Add to graph
+        # 7. Add to graph
         node = DocNode(
             doc_id=doc_id,
             file_name=file_path.name,
@@ -153,7 +171,7 @@ def ingest_document(
         )
         graph.add_document(node)
 
-        # 6. Link to related documents (shared topics)
+        # 8. Link to related documents (shared topics)
         _link_related(doc_id, node.topics, graph)
 
         _log(config, f"Done: {meta.get('title', file_path.name)}")
@@ -175,6 +193,99 @@ def ingest_document(
             success=False,
             error=str(e),
         )
+
+
+def _ingest_split(
+    tree: dict,
+    doc_id: str,
+    file_path: Path,
+    pages: list,
+    meta: dict,
+    config: PageIndexConfig,
+    store: TreeStore,
+    graph: DocumentGraph,
+) -> IngestResult:
+    """
+    Handle ingestion of a document that was split into multiple sub-trees.
+
+    Creates:
+    - A parent DocNode (no tree stored) for document-level identity
+    - N child DocNodes, each with their own tree and rich metadata
+    - 'part_of' edges linking children → parent
+    """
+    parent_title = meta.get("title", file_path.stem)
+
+    # 1. Register the parent document (no tree — it's just a grouping node)
+    parent_node = DocNode(
+        doc_id=doc_id,
+        file_name=file_path.name,
+        title=parent_title,
+        summary=meta.get("summary", ""),
+        topics=meta.get("topics", []),
+        entities=meta.get("entities", []),
+        doc_type=file_path.suffix.lstrip("."),
+        page_count=len(pages),
+    )
+    graph.add_document(parent_node)
+
+    # 2. Split the tree
+    sub_trees = split_tree(tree, parent_doc_id=doc_id)
+    _log(config, f"   Split into {len(sub_trees)} sub-trees.")
+
+    # 3. Save each sub-tree
+    for st in sub_trees:
+        sub_doc_id = st["sub_doc_id"]
+        sub_tree_data = st["tree"]
+
+        # Strip internal fields
+        sub_tree_data.pop("_markdown", None)
+
+        # Save the sub-tree
+        store.save(sub_doc_id, sub_tree_data)
+
+        # Extract metadata from node content (no LLM call)
+        sub_meta = extract_subtree_metadata(
+            nodes=sub_tree_data.get("nodes", []),
+            parent_title=parent_title,
+            source_file=file_path.name,
+        )
+
+        # Register in the graph
+        sub_node = DocNode(
+            doc_id=sub_doc_id,
+            file_name=file_path.name,
+            title=sub_meta.get("title", st["title"]),
+            summary=sub_meta.get("summary", st["summary"]),
+            topics=sub_meta.get("topics", meta.get("topics", [])),
+            entities=sub_meta.get("entities", []),
+            doc_type=file_path.suffix.lstrip("."),
+            page_count=st["page_range"][1] - st["page_range"][0] + 1,
+            parent_doc_id=doc_id,
+        )
+        graph.add_document(sub_node)
+
+        # Link sub-tree → parent
+        graph.add_edge(sub_doc_id, doc_id, "part_of", 1.0)
+
+        _log(
+            config,
+            f"   Part {st['part_index'] + 1}/{len(sub_trees)}: "
+            f"{st['title'][:60]} (pages {st['page_range'][0]}-{st['page_range'][1]})",
+        )
+
+    # 4. Link parent to related documents
+    _link_related(doc_id, parent_node.topics, graph)
+
+    _log(config, f"Done: {parent_title} ({len(sub_trees)} sub-trees)")
+
+    return IngestResult(
+        doc_id=doc_id,
+        file_name=file_path.name,
+        title=parent_title,
+        topics=parent_node.topics,
+        page_count=len(pages),
+        success=True,
+    )
 
 
 def _link_related(

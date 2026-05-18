@@ -240,14 +240,17 @@ class Orchestrator:
 
         for rnd in range(1, max_rounds + 1):
             # ── Hunt ─────────────────────────────────────────────────────
+            is_parallel = getattr(self.config, 'parallel_hunting', True)
+            mode_str = "in parallel" if is_parallel else "sequentially"
+            
             if verbose:
                 _trail_header(f"ROUND {rnd}/{max_rounds} — HUNTER")
-                _trail_step("Hunter", f"Searching {len(doc_ids)} document(s) in parallel ...")
+                _trail_step("Hunter", f"Searching {len(doc_ids)} document(s) {mode_str} ...")
                 if rnd > 1:
                     _trail_step("Hunter", f"Refined query: '{effective_question}'")
                     _trail_step("Hunter", f"Excluding {len(visited_nodes)} previously-visited node(s)")
-            self._log(f"[Round {rnd}] Hunting across {len(doc_ids)} documents ...")
-            trace.append(f"[Hunter:R{rnd}] Searching {len(doc_ids)} documents ...")
+            self._log(f"[Round {rnd}] Hunting across {len(doc_ids)} documents {mode_str} ...")
+            trace.append(f"[Hunter:R{rnd}] Searching {len(doc_ids)} documents {mode_str} ...")
 
             hunt_results = self.hunter.hunt_parallel(
                 doc_ids,
@@ -255,6 +258,7 @@ class Orchestrator:
                 history=history,
                 max_workers=min(5, len(doc_ids)),
                 exclude_nodes=visited_nodes if visited_nodes else None,
+                parallel=getattr(self.config, 'parallel_hunting', True),
             )
 
             # Collect new chunks

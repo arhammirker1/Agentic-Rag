@@ -179,6 +179,7 @@ class HunterAgent:
         history: Optional[List[Dict[str, str]]] = None,
         max_workers: int = 5,
         exclude_nodes: Optional[set] = None,
+        parallel: bool = True,
     ) -> List[HuntResult]:
         """
         Search multiple documents in parallel using a thread pool.
@@ -190,12 +191,26 @@ class HunterAgent:
         history       : Optional conversation history.
         max_workers   : Max concurrent threads.
         exclude_nodes : Node IDs to skip (already retrieved in prior rounds).
+        parallel      : If False, hunt sequentially instead of using threads.
 
         Returns
         -------
         List of HuntResult, one per document.
         """
         results: List[HuntResult] = []
+
+        if not parallel:
+            for doc_id in doc_ids:
+                try:
+                    result = self.hunt(doc_id, question, history, exclude_nodes)
+                    results.append(result)
+                except Exception as e:
+                    results.append(HuntResult(
+                        doc_id=doc_id,
+                        success=False,
+                        error=str(e),
+                    ))
+            return results
 
         with ThreadPoolExecutor(max_workers=min(max_workers, len(doc_ids))) as pool:
             futures = {
@@ -223,6 +238,7 @@ class HunterAgent:
         history: Optional[List[Dict[str, str]]] = None,
         max_workers: int = 5,
         exclude_fn: Optional[Any] = None,
+        parallel: bool = True,
     ) -> List[HuntResult]:
         """
         Search multiple documents in parallel, with per-document exclude sets.
@@ -239,12 +255,27 @@ class HunterAgent:
         max_workers: Max concurrent threads.
         exclude_fn : Callable(doc_id) -> set of node_ids to exclude for
                      that specific document.  If None, no nodes are excluded.
+        parallel   : If False, hunt sequentially instead of using threads.
 
         Returns
         -------
         List of HuntResult, one per document.
         """
         results: List[HuntResult] = []
+
+        if not parallel:
+            for doc_id in doc_ids:
+                try:
+                    per_doc_exclude = exclude_fn(doc_id) if exclude_fn else None
+                    result = self.hunt(doc_id, question, history, per_doc_exclude)
+                    results.append(result)
+                except Exception as e:
+                    results.append(HuntResult(
+                        doc_id=doc_id,
+                        success=False,
+                        error=str(e),
+                    ))
+            return results
 
         with ThreadPoolExecutor(max_workers=min(max_workers, len(doc_ids))) as pool:
             futures = {}

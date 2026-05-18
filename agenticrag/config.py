@@ -136,6 +136,10 @@ class PageIndexConfig:
 
     max_retrieval_iterations: int = 5
 
+    enable_pre_filtering:    bool  = True   # Filter large trees via keyword search before LLM loop
+    pre_filter_threshold:    int   = 50     # Min node count to activate pre-filtering
+    max_filter_candidates:   int   = 20     # Top-N matched nodes kept in candidate sub-tree
+
     temperature:             float = 0.0
     max_output_tokens:       int   = 4096
     verbose:                 bool  = False
@@ -175,6 +179,7 @@ class ForestConfig(PageIndexConfig):
     data_dir:           str  = "./pageindex_data"
     max_docs_per_query: int  = 5
     max_hunt_workers:   int  = 5
+    parallel_hunting:   bool = True   # If False, hunts documents sequentially (saves TPM)
     enable_critic:      bool = True
     max_retrieval_rounds: int = 3   # Max hunt→synthesize→evaluate cycles
     add_node_text:      bool = True  # Required for Forest to access raw text

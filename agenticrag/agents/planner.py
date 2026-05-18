@@ -135,10 +135,15 @@ class PlannerAgent:
 
         if total <= self.max_docs:
             all_docs = self.graph.list_documents()
+            # Filter out parent-only grouping nodes (they have no tree
+            # stored — only their sub-tree children do).  A parent node
+            # is one that has children with parent_doc_id pointing to it.
+            parent_ids = {d.parent_doc_id for d in all_docs if d.parent_doc_id}
+            searchable = [d for d in all_docs if d.doc_id not in parent_ids]
             return PlanResult(
-                doc_ids=[d.doc_id for d in all_docs],
-                reasoning=f"Searching all {total} documents.",
-                doc_nodes=all_docs,
+                doc_ids=[d.doc_id for d in searchable],
+                reasoning=f"Searching all {len(searchable)} documents.",
+                doc_nodes=searchable,
             )
 
         # 1. Extract search terms from the question
@@ -149,13 +154,13 @@ class PlannerAgent:
         # 2. Query the graph
         candidates: Dict[str, DocNode] = {}
 
-        # Search by topics
-        for doc in self.graph.search_by_topics(topics, limit=self.max_docs * 2):
+        # Search by topics (wider limit to catch sub-tree parts)
+        for doc in self.graph.search_by_topics(topics, limit=self.max_docs * 4):
             candidates[doc.doc_id] = doc
 
         # Search by text
         for term in search_terms[:5]:
-            for doc in self.graph.search_by_text(term, limit=self.max_docs):
+            for doc in self.graph.search_by_text(term, limit=self.max_docs * 2):
                 candidates[doc.doc_id] = doc
 
         if not candidates:
@@ -167,8 +172,18 @@ class PlannerAgent:
                 doc_nodes=all_docs,
             )
 
+        # Filter out parent-only grouping nodes (no tree stored)
+        parent_ids = {
+            d.parent_doc_id for d in candidates.values() if d.parent_doc_id
+        }
+        searchable = {
+            did: d for did, d in candidates.items() if did not in parent_ids
+        }
+        if not searchable:
+            searchable = candidates  # safety fallback
+
         # 3. Rank candidates with LLM
-        ranked = self._rank_candidates(question, list(candidates.values()))
+        ranked = self._rank_candidates(question, list(searchable.values()))
 
         return ranked
 
@@ -195,7 +210,7 @@ class PlannerAgent:
                 api_key=self.api_key,
                 base_url=self.base_url,
                 temperature=0.0,
-                max_tokens=256,
+                max_tokens=1024,
                 quiet=self.quiet,
                 enable_thinking=self.enable_thinking,
                 num_ctx=self.num_ctx,
@@ -235,7 +250,7 @@ class PlannerAgent:
                 api_key=self.api_key,
                 base_url=self.base_url,
                 temperature=0.0,
-                max_tokens=256,
+                max_tokens=1024,
                 quiet=self.quiet,
                 enable_thinking=self.enable_thinking,
                 num_ctx=self.num_ctx,

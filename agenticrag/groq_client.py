@@ -28,6 +28,7 @@ from typing import Any, Dict, List, Optional
 
 _groq_client = None   # module-level singleton (Groq SDK)
 _local_client = None  # module-level singleton (httpx for local LLMs)
+_gemini_client = None # module-level singleton (Google GenAI)
 
 # Default context window for local LLMs.
 # Ollama's default is 2048 which is far too small for RAG evidence.
@@ -80,6 +81,28 @@ def _get_client(api_key: Optional[str] = None, base_url: Optional[str] = None):
         _groq_client = Groq(api_key=key)
     return _groq_client, None
 
+def _get_gemini_client(api_key: Optional[str] = None):
+    """Return a cached Google GenAI client."""
+    global _gemini_client
+    if _gemini_client is None or api_key:
+        try:
+            from google import genai
+        except ImportError:
+            raise ImportError(
+                "The `google-genai` package is required to use Gemini.\n"
+                "Install it with:  pip install google-genai"
+            )
+        key = api_key or os.environ.get("GEMINI_API_KEY")
+        if not key:
+            raise ValueError(
+                "No Gemini API key found.\n"
+                "Either pass api_key=... to PageIndexConfig, or set the "
+                "GEMINI_API_KEY environment variable.\n"
+                "Get a free key at: https://aistudio.google.com/app/apikey"
+            )
+        _gemini_client = genai.Client(api_key=key)
+    return _gemini_client
+
 
 def chat(
     prompt: str,
@@ -110,7 +133,14 @@ def chat(
     enable_thinking  : If True, allow Qwen3/DeepSeek deep thinking mode
                        If False (default), append /no_think for faster responses
     """
-    client, local_url = _get_client(api_key, base_url)
+    is_gemini = model.lower().startswith("gemini")
+    
+    if is_gemini:
+        gemini_client = _get_gemini_client(api_key)
+        client, local_url = None, None
+    else:
+        gemini_client = None
+        client, local_url = _get_client(api_key, base_url)
 
     # Build messages
     messages: List[Dict[str, str]] = []
@@ -155,6 +185,22 @@ def chat(
         resp.raise_for_status()
         data = resp.json()
         output = data["choices"][0]["message"]["content"] or ""
+    elif is_gemini:
+        # ── Google GenAI SDK ──
+        from google import genai
+        config_kwargs = {
+            "temperature": temperature,
+            "max_output_tokens": max_tokens,
+        }
+        if system:
+            config_kwargs["system_instruction"] = system
+            
+        response = gemini_client.models.generate_content(
+            model=model,
+            contents=user_content,
+            config=genai.types.GenerateContentConfig(**config_kwargs)
+        )
+        output = response.text or ""
     else:
         # ── Groq SDK ──
         response = client.chat.completions.create(

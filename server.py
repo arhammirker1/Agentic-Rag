@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Optional
 
 # Fix Windows encoding
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace", line_buffering=True)
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -123,6 +123,10 @@ def _get_forest(notebook_id: str) -> Forest:
             config_kwargs["api_key"] = settings["api_key"]
         else:
             config_kwargs["api_key"] = "local"
+    elif settings.get("provider") == "gemini":
+        api_key = settings.get("api_key") or os.environ.get("GEMINI_API_KEY", "")
+        if api_key:
+            config_kwargs["api_key"] = api_key
     else:
         api_key = settings.get("api_key") or os.environ.get("GROQ_API_KEY", "")
         if api_key:
@@ -343,7 +347,10 @@ async def get_settings():
         settings["api_key_set"] = True
         settings["api_key"] = ""
     else:
-        settings["api_key_set"] = bool(os.environ.get("GROQ_API_KEY"))
+        if settings.get("provider") == "gemini":
+            settings["api_key_set"] = bool(os.environ.get("GEMINI_API_KEY"))
+        else:
+            settings["api_key_set"] = bool(os.environ.get("GROQ_API_KEY"))
     return settings
 
 
@@ -384,6 +391,12 @@ async def list_models():
             {"id": LocalModel.MISTRAL, "name": "Mistral (4.1GB, 32K ctx)"},
             {"id": LocalModel.PHI4, "name": "Phi-4 (9.1GB, 16K ctx)"},
             {"id": LocalModel.GEMMA3_12B, "name": "Gemma 3 12B (8.1GB, 128K ctx)"},
+        ],
+        "gemini": [
+            {"id": "gemini-2.5-flash", "name": "Gemini 2.5 Flash (1M ctx, High Limits)"},
+            {"id": "gemini-2.5-pro", "name": "Gemini 2.5 Pro (2M ctx, Deep Reasoning)"},
+            {"id": "gemini-1.5-flash", "name": "Gemini 1.5 Flash (1M ctx, Fast)"},
+            {"id": "gemini-1.5-pro", "name": "Gemini 1.5 Pro (2M ctx, Capable)"},
         ]
     }
 
@@ -436,5 +449,6 @@ if __name__ == "__main__":
     print("  ──────────────────────────────────────────────────────────")
     print(f"  Share the LAN URL with devices on your network.")
     print(f"  Only devices on your local network can access it.\n")
+    sys.stdout.flush()
 
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")

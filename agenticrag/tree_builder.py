@@ -112,6 +112,10 @@ def build_tree(
         "nodes": nodes,
     }
 
+    # Expose raw markdown for the tree splitter (stripped before saving)
+    if use_local_md:
+        result["_markdown"] = structured_md
+
     if config.add_doc_description:
         _log(config, "[*] Generating document description ...")
         result["document_description"] = _make_doc_description(nodes, config)

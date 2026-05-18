@@ -1,6 +1,7 @@
 {
   "provider": "groq",
-  "model": "meta-llama/llama-4-scout-17b-16e-instruct",
+  "model": "openai/gpt-oss-20b",
   "api_key": "",
-  "base_url": ""
+  "base_url": "",
+  "enable_thinking": false
 }

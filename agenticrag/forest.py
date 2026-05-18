@@ -246,26 +246,35 @@ class Forest:
         self.store.delete(doc_id)
         self.graph.remove_document(doc_id)
 
-    def documents(self) -> List[Dict[str, Any]]:
+    def documents(self, include_parts: bool = False) -> List[Dict[str, Any]]:
         """
         List all indexed documents with their metadata.
+
+        Parameters
+        ----------
+        include_parts : If False (default), hide sub-tree parts and show
+                        only top-level documents.  Set True to see all
+                        sub-trees.
 
         Returns
         -------
         List of dicts with doc_id, title, topics, summary, etc.
         """
         nodes = self.graph.list_documents()
-        return [
-            {
+        result = []
+        for n in nodes:
+            # Skip sub-tree parts unless requested
+            if not include_parts and n.parent_doc_id is not None:
+                continue
+            result.append({
                 "doc_id": n.doc_id,
                 "file_name": n.file_name,
                 "title": n.title,
                 "summary": n.summary,
                 "topics": n.topics,
                 "page_count": n.page_count,
-            }
-            for n in nodes
-        ]
+            })
+        return result
 
     @property
     def size(self) -> int:

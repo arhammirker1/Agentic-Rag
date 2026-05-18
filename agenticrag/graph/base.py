@@ -38,6 +38,7 @@ class DocNode:
     entities:   List[str]       = field(default_factory=list)
     doc_type:   str             = "pdf"
     page_count: int             = 0
+    parent_doc_id: Optional[str] = None   # set for sub-trees of a split document
     extra:      Dict[str, Any]  = field(default_factory=dict)
 
 

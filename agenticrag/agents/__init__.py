@@ -2,6 +2,7 @@
 agenticrag.agents -- Multi-agent retrieval system.
 
 Agents:
+  - KeywordAgent     : Expands a question into search keywords for pre-filtering.
   - PlannerAgent     : Selects which documents to search based on graph metadata.
   - HunterAgent      : Searches individual document trees (parallel).
   - SynthesizerAgent : Combines findings into a cohesive answer with citations.
@@ -10,6 +11,7 @@ Agents:
   - Orchestrator     : Runs the full agentic loop.
 """
 
+from .keyword_agent import KeywordAgent
 from .planner import PlannerAgent
 from .hunter import HunterAgent, HuntResult
 from .synthesizer import SynthesizerAgent
@@ -18,6 +20,7 @@ from .critic import CriticAgent, VerificationResult
 from .orchestrator import Orchestrator, ForestResult
 
 __all__ = [
+    "KeywordAgent",
     "PlannerAgent",
     "HunterAgent",
     "HuntResult",

@@ -109,6 +109,19 @@ class TreeSearcher:
             if not node.get("nodes")
         ]
 
+        # Keyword agent for large-tree pre-filtering.
+        # Lazy import avoids any potential circular dependency since
+        # agents/hunter.py imports TreeSearcher but keyword_agent.py does not.
+        from .agents.keyword_agent import KeywordAgent
+        self._keyword_agent = KeywordAgent(
+            model=self.config.model,
+            api_key=self.config.api_key,
+            base_url=self.config.base_url,
+            quiet=self.config.quiet,
+            enable_thinking=self.config.enable_thinking,
+            num_ctx=self.config.num_ctx,
+        )
+
     # ── Public ───────────────────────────────────────────────────────────
 
     def answer(
@@ -173,8 +186,70 @@ class TreeSearcher:
             )
 
         # ── Standard iterative retrieval ──────────────────────────────
-        tree_json  = json.dumps(self._compact_tree(), indent=2)
-        max_iter   = self.config.max_retrieval_iterations
+        # For large trees, run keyword expansion + local search first to
+        # build a compact candidate sub-tree (saves ~95% of prompt tokens).
+        pre_filter_enabled   = getattr(self.config, 'enable_pre_filtering', True)
+        pre_filter_threshold = getattr(self.config, 'pre_filter_threshold', 50)
+        max_candidates       = getattr(self.config, 'max_filter_candidates', 20)
+        use_pre_filter       = (
+            pre_filter_enabled and len(self._index) > pre_filter_threshold
+        )
+
+        if use_pre_filter:
+            from .utils.logging import trail
+            trail.step(
+                "PRE-FILTER INITIATED",
+                f"Tree size ({len(self._index)} nodes) exceeds threshold ({pre_filter_threshold}).\n"
+                f"Running keyword pre-filtering to build a compact candidate sub-tree.",
+                quiet=self.config.quiet
+            )
+            log.debug(
+                f"Pre-filter: {len(self._index)} nodes > threshold "
+                f"{pre_filter_threshold} — expanding keywords"
+            )
+            steps.append(
+                f"[pre-filter] Tree has {len(self._index)} nodes — "
+                f"expanding keywords for local candidate search ..."
+            )
+            expanded_kws = self._keyword_agent.expand(question, history)
+            matched_ids  = self._local_node_search(expanded_kws)
+            steps.append(
+                f"[pre-filter] {len(expanded_kws)} terms → "
+                f"{len(matched_ids)} matching nodes"
+            )
+
+            if matched_ids:
+                candidate_ids     = matched_ids[:max_candidates]
+                candidate_subtree = self._build_candidate_subtree(candidate_ids)
+                steps.append(
+                    f"[pre-filter] Candidate sub-tree: "
+                    f"top-{len(candidate_ids)} nodes + ancestors"
+                )
+                log.debug(
+                    f"Pre-filter built candidate sub-tree "
+                    f"({len(candidate_ids)} seed nodes)"
+                )
+                trail.step(
+                    "PRE-FILTER COMPLETED",
+                    f"Successfully filtered tree of {len(self._index)} nodes down to {len(candidate_ids)} candidate seed nodes.",
+                    {"candidate_seed_ids": candidate_ids, "matched_keywords": expanded_kws},
+                    quiet=self.config.quiet
+                )
+                tree_json = json.dumps(candidate_subtree, indent=2)
+            else:
+                # No keyword hits anywhere — fall back to full compact tree
+                log.debug("Pre-filter: zero keyword matches — using full tree")
+                steps.append("[pre-filter] No matches — falling back to full tree")
+                trail.step(
+                    "PRE-FILTER COMPLETED (NO MATCHES)",
+                    "Zero keyword matches found. Falling back to the full compact tree.",
+                    quiet=self.config.quiet
+                )
+                tree_json = json.dumps(self._compact_tree(), indent=2)
+        else:
+            tree_json = json.dumps(self._compact_tree(), indent=2)
+
+        max_iter = self.config.max_retrieval_iterations
 
         for i in range(1, max_iter + 1):
             # 1. Select nodes
@@ -268,6 +343,104 @@ class TreeSearcher:
             e = max(e, s + 1)
             return "\n\n".join(self.pages[s:e])
         return f"[Pages {node.get('start_index')}–{node.get('end_index')}]"
+
+    # ── Candidate sub-tree pre-filtering ─────────────────────────────────
+
+    def _local_node_search(self, keywords: List[str]) -> List[str]:
+        """
+        Score every indexed node by keyword hit-count using fast case-insensitive
+        regex matching across title (weighted 3×), summary (2×), and a text
+        preview (1×, first 600 chars).  Zero LLM calls — pure local search.
+
+        Returns node IDs ranked best-match first.
+        """
+        if not keywords:
+            return []
+
+        # De-duplicate while preserving insertion order
+        unique_kws = list(dict.fromkeys(keywords))
+        patterns: List[re.Pattern] = []
+        for kw in unique_kws:
+            try:
+                patterns.append(re.compile(re.escape(kw), re.IGNORECASE))
+            except re.error:
+                pass
+        if not patterns:
+            return []
+
+        scored: List[Tuple[int, str]] = []
+        for nid, node in self._index.items():
+            title   = node.get("title", "")
+            summary = node.get("summary", "")
+            text    = node.get("text", "")[:600]
+            # Title weighted 3×, summary 2×, text preview 1×
+            searchable = f"{title} {title} {title} {summary} {summary} {text}"
+            hits = sum(1 for pat in patterns if pat.search(searchable))
+            if hits > 0:
+                scored.append((hits, nid))
+
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return [nid for _, nid in scored]
+
+    def _build_parent_map(
+        self,
+        nodes: List[Dict],
+        parent_id: Optional[str] = None,
+    ) -> Dict[str, Optional[str]]:
+        """Recursively build a {node_id → parent_id} lookup for the entire tree."""
+        result: Dict[str, Optional[str]] = {}
+        for node in nodes:
+            nid = node.get("node_id")
+            if nid:
+                result[nid] = parent_id
+                result.update(
+                    self._build_parent_map(node.get("nodes", []), nid)
+                )
+        return result
+
+    def _build_candidate_subtree(self, matched_ids: List[str]) -> List[Dict]:
+        """
+        Given top-N matched node IDs, reconstruct a pruned, compact sub-tree
+        containing those nodes AND every ancestor up to the document root.
+
+        Ancestors are included so the LLM retains full hierarchical context
+        (e.g. knowing node 0042 belongs to "Section 4: Financial Risks"
+        rather than "Section 12: Appendix").
+
+        Returns text-free nodes — identical format to _compact_tree() — so
+        the result slots directly into the SELECT_NODES prompt.
+        """
+        if not matched_ids:
+            return []
+
+        parent_map = self._build_parent_map(self.tree.get("nodes", []))
+
+        # Walk each matched node up to the root, collecting all ancestor IDs
+        include_ids: set = set()
+        for mid in matched_ids:
+            current: Optional[str] = mid
+            while current is not None:
+                include_ids.add(current)
+                current = parent_map.get(current)   # None signals root reached
+
+        # Recursively filter the original tree, keeping only included nodes
+        def _filter(nodes: List[Dict]) -> List[Dict]:
+            out: List[Dict] = []
+            for node in nodes:
+                nid = node.get("node_id")
+                if nid not in include_ids:
+                    continue
+                compact = {
+                    k: v for k, v in node.items()
+                    if k not in ("text", "nodes")
+                }
+                children = _filter(node.get("nodes", []))
+                if children:
+                    compact["nodes"] = children
+                out.append(compact)
+            return out
+
+        return _filter(self.tree.get("nodes", []))
 
     def _select(
         self,

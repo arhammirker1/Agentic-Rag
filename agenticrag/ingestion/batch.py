@@ -35,8 +35,9 @@ from ..config import ForestConfig
 from ..graph.base import DocNode, DocumentGraph
 from ..storage.base import TreeStore
 from ..tree_builder import build_tree
+from ..tree_splitter import should_split, split_tree
 from ..pdf_parser import extract_pages
-from .metadata import extract_metadata
+from .metadata import extract_metadata, extract_subtree_metadata
 from .pipeline import _generate_doc_id, _link_related
 
 log = logging.getLogger(__name__)
@@ -282,32 +283,79 @@ def batch_ingest(
         doc_start = time.time()
 
         try:
-            # Save tree
-            store.save(doc_id, tree)
-
-            # Add to graph
             pages = extract_pages(f)
-            node = DocNode(
-                doc_id=doc_id,
-                file_name=f.name,
-                title=meta.get("title", f.stem),
-                summary=meta.get("summary", ""),
-                topics=meta.get("topics", []),
-                entities=meta.get("entities", []),
-                doc_type=f.suffix.lstrip("."),
-                page_count=len(pages),
-            )
-            graph.add_document(node)
+            parent_title = meta.get("title", f.stem)
 
-            # Link to related documents
-            _link_related(doc_id, node.topics, graph)
+            # Check if tree needs splitting
+            if should_split(tree):
+                _log(config, f"    Splitting {f.name} into sub-trees ...")
+
+                # Register parent node (grouping only, no tree)
+                parent_node = DocNode(
+                    doc_id=doc_id,
+                    file_name=f.name,
+                    title=parent_title,
+                    summary=meta.get("summary", ""),
+                    topics=meta.get("topics", []),
+                    entities=meta.get("entities", []),
+                    doc_type=f.suffix.lstrip("."),
+                    page_count=len(pages),
+                )
+                graph.add_document(parent_node)
+
+                # Split and save each sub-tree
+                sub_trees = split_tree(tree, parent_doc_id=doc_id)
+                for st in sub_trees:
+                    sub_doc_id = st["sub_doc_id"]
+                    sub_tree_data = st["tree"]
+                    sub_tree_data.pop("_markdown", None)
+                    store.save(sub_doc_id, sub_tree_data)
+
+                    sub_meta = extract_subtree_metadata(
+                        nodes=sub_tree_data.get("nodes", []),
+                        parent_title=parent_title,
+                        source_file=f.name,
+                    )
+                    sub_node = DocNode(
+                        doc_id=sub_doc_id,
+                        file_name=f.name,
+                        title=sub_meta.get("title", st["title"]),
+                        summary=sub_meta.get("summary", st["summary"]),
+                        topics=sub_meta.get("topics", meta.get("topics", [])),
+                        entities=sub_meta.get("entities", []),
+                        doc_type=f.suffix.lstrip("."),
+                        page_count=st["page_range"][1] - st["page_range"][0] + 1,
+                        parent_doc_id=doc_id,
+                    )
+                    graph.add_document(sub_node)
+                    graph.add_edge(sub_doc_id, doc_id, "part_of", 1.0)
+
+                _link_related(doc_id, parent_node.topics, graph)
+                _log(config, f"    Split into {len(sub_trees)} sub-trees")
+            else:
+                # Normal single-tree save
+                tree.pop("_markdown", None)
+                store.save(doc_id, tree)
+
+                node = DocNode(
+                    doc_id=doc_id,
+                    file_name=f.name,
+                    title=parent_title,
+                    summary=meta.get("summary", ""),
+                    topics=meta.get("topics", []),
+                    entities=meta.get("entities", []),
+                    doc_type=f.suffix.lstrip("."),
+                    page_count=len(pages),
+                )
+                graph.add_document(node)
+                _link_related(doc_id, node.topics, graph)
 
             elapsed = time.time() - doc_start
             result.succeeded += 1
             result.results.append(DocResult(
                 doc_id=doc_id,
                 file_name=f.name,
-                title=node.title,
+                title=parent_title,
                 success=True,
                 elapsed=elapsed,
             ))

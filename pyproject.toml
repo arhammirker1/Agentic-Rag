@@ -3,8 +3,8 @@ requires = ["setuptools>=61.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "agenticrag"
-version = "2.0.0"
+name = "agentic-rag-core"
+version = "2.0.1"
 description = "Vectorless, Reasoning-based RAG — multi-document agentic retrieval with zero hallucination"
 authors = [
     { name = "Arham Mirkar", email = "arhammirker1@gmail.com" }
@@ -29,6 +29,7 @@ dependencies = [
     "groq>=0.9.0",
     "pdfplumber>=0.10.0",
     "python-dotenv>=1.0.0",
+    "google-genai>=0.2.0",
 ]
 
 [project.optional-dependencies]
