@@ -5,3 +5,15 @@ __pycache__/
 .idea/
 results/
 markitdown-main/
+*.egg-info/
+dist/
+build/
+.pypirc
+pypi_api.txt
+benchmarks/pdfs/
+benchmarks/_chroma_db/
+benchmarks/_agenticrag_data/
+benchmarks/dataset_cache.json
+benchmarks/results/
+pageindex_data/
+notebooks_data/

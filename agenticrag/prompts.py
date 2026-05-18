@@ -162,6 +162,32 @@ or
 {{"sufficient": false, "missing": "<what is still needed>"}}
 """
 
+EXPAND_KEYWORDS = """\
+You are a search keyword expansion expert.  Given a user's question, generate a
+comprehensive list of keyphrases, keywords, and synonyms likely to appear
+verbatim (or near-verbatim) inside a document that answers this question.
+
+Question: "{question}"
+
+{history_block}
+
+Return JSON:
+{{
+  "keyphrases": ["<multi-word phrase 1>", "<multi-word phrase 2>"],
+  "keywords":   ["<single keyword 1>", "<single keyword 2>"],
+  "synonyms":   ["<synonym or domain term 1>", "<synonym 2>"]
+}}
+
+Rules:
+- "keyphrases": 3-8 multi-word phrases (2+ words) an author would write when
+  covering this topic.  Prefer specific technical or domain phrases.
+- "keywords": 5-15 important single words (skip stop-words like "the", "is", "a").
+- "synonyms": 3-8 alternative terms, abbreviations, or domain-specific vocabulary
+  for the core concepts in the question.
+- Think about the vocabulary an expert in this field would use.
+- Include both common abbreviations and their expanded forms where relevant.
+"""
+
 FINAL_ANSWER = """\
 Answer the following question based ONLY on the document sections provided below.
 

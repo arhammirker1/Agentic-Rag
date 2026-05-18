@@ -198,6 +198,7 @@ input,textarea{font-family:var(--sans);font-size:15px;outline:none}
     <label>Provider</label>
     <select id="s-provider" onchange="toggleProvider()">
       <option value="groq">Groq Cloud (free)</option>
+      <option value="gemini">Google Gemini (High Limits)</option>
       <option value="local">Local LLM (Ollama / LM Studio)</option>
     </select>
     <label>Model</label>
@@ -222,7 +223,7 @@ input,textarea{font-family:var(--sans);font-size:15px;outline:none}
 <div class="toast" id="toast"></div>
 
 <script>
-let currentNb=null,notebooks=[],groqModels=[],localModels=[];
+let currentNb=null,notebooks=[],groqModels=[],localModels=[],geminiModels=[];
 
 // API helpers
 async function api(url,opts={}){const r=await fetch(url,{headers:{'Content-Type':'application/json'},...opts});if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.detail||r.statusText)}return r.json()}
@@ -448,7 +449,7 @@ function fmtSize(b){if(b<1024)return b+' B';if(b<1048576)return(b/1024).toFixed(
 // Settings
 async function showSettings(){
   const s=await api('/api/settings');const m=await api('/api/models');
-  groqModels=m.groq;localModels=m.local||m.local_examples;
+  groqModels=m.groq;localModels=m.local||m.local_examples;geminiModels=m.gemini||[];
   document.getElementById('s-provider').value=s.provider||'groq';
   document.getElementById('s-url').value=s.base_url||'';
   document.getElementById('s-thinking').checked=s.enable_thinking||false;
@@ -463,7 +464,7 @@ function toggleProvider(){
   const p=document.getElementById('s-provider').value;
   document.getElementById('s-local-fields').style.display=p==='local'?'':'none';
   const sel=document.getElementById('s-model');
-  const models=p==='local'?localModels:groqModels;
+  const models=p==='local'?localModels:p==='gemini'?geminiModels:groqModels;
   sel.innerHTML=models.map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
 }
 
