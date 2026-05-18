@@ -29,10 +29,12 @@ Multi-document (Forest):
 """
 
 import os
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
-# Automatically load .env file so API keys are discovered without extra code
-load_dotenv()
+# Automatically load .env file so API keys are discovered without extra code.
+# Search starting from the current working directory (CWD) of the running process,
+# and override any existing (possibly blank) env vars.
+load_dotenv(find_dotenv(usecwd=True), override=True)
 
 # ── Core (single document) ───────────────────────────────────────────────
 from .config import PageIndexConfig, ForestConfig, GroqModel, LocalModel
@@ -73,6 +75,6 @@ __all__ = [
     "SQLiteGraph",
 ]
 
-__version__ = "2.0.1"
+__version__ = "2.1.2"
 __author__  = "Arham Mirkar"
 __license__ = "MIT"

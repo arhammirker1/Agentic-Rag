@@ -22,8 +22,8 @@ from typing import Optional
 # Fix Windows encoding
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace", line_buffering=True)
 
-from dotenv import load_dotenv
-load_dotenv()
+from dotenv import load_dotenv, find_dotenv
+load_dotenv(find_dotenv(usecwd=True), override=True)
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse

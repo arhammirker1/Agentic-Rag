@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agentic-rag-core"
-version = "2.1.1"
+version = "2.1.2"
 description = "Vectorless, Reasoning-based RAG — multi-document agentic retrieval with zero hallucination"
 authors = [
     { name = "Arham Mirkar", email = "arhammirker1@gmail.com" }
