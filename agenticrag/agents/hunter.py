@@ -86,6 +86,14 @@ class HunterAgent:
         Returns
         -------
         HuntResult with text chunks and metadata.
+
+        Notes
+        -----
+        If the TreeSearcher's final answer begins with "NO_INFO", it means
+        the retrieved nodes contained no relevant information for this question.
+        In that case we discard ALL chunks for this document so the Orchestrator
+        does not forward irrelevant text to the Synthesizer, preventing token
+        bloat and rate-limit errors.
         """
         try:
             # Load the tree from storage
@@ -100,6 +108,29 @@ class HunterAgent:
                 pre_visited=exclude_nodes,
                 pre_expanded_keywords=pre_expanded_keywords,
             )
+
+            # ── NO_INFO gate ──────────────────────────────────────────
+            # The FINAL_ANSWER prompt instructs the LLM to begin its
+            # response with exactly "NO_INFO" when none of the retrieved
+            # sections contain relevant information.  Forwarding those
+            # chunks to the Synthesizer would inflate the prompt with
+            # useless text and can push the request over the TPM limit.
+            # We drop them here so only signal-bearing chunks survive.
+            if result.text.startswith("NO_INFO"):
+                log.info(
+                    f"[hunter] doc='{doc_id}' returned NO_INFO — "
+                    f"discarding {len(result.retrieved_nodes)} node(s) "
+                    f"as irrelevant to prevent Synthesizer token bloat."
+                )
+                return HuntResult(
+                    doc_id=doc_id,
+                    doc_title=doc_title,
+                    chunks=[],          # no chunks — document is irrelevant
+                    reasoning_steps=result.reasoning_steps
+                    + [f"[NO_INFO] Document '{doc_id}' pruned — no relevant content found."],
+                    iterations=result.iterations,
+                    success=True,       # not an error; document was searched successfully
+                )
 
             # Package the chunks with source metadata
             chunks = []

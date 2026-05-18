@@ -203,7 +203,9 @@ Retrieved sections:
 ---
 Give a DETAILED, thorough, and well-explained answer.
 - Cite section titles and page ranges where helpful.
-- If the information is not in the retrieved sections, say so clearly.
+- If the information is not in the retrieved sections, your response MUST begin
+  with exactly "NO_INFO" as the very first characters (e.g. "NO_INFO: This document
+  does not contain information about ..."). Do not use any other phrasing.
 - Do not make up information.
 - DO NOT merely list section names or topic labels — EXPLAIN what each point
   actually says, including specific details, numbers, and examples from the text.
