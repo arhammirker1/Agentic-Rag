@@ -271,6 +271,58 @@ class HunterAgent:
 
         return results
 
+    def quick_score(self, doc_id: str, keywords: List[str]) -> int:
+        """
+        Return the max keyword score for a tree without any LLM calls.
+        Used by the Orchestrator to rank and prune candidate trees before
+        launching expensive parallel hunters.
+
+        Parameters
+        ----------
+        doc_id   : Document to score.
+        keywords : Pre-expanded keyword list from the KeywordAgent.
+
+        Returns
+        -------
+        Integer score (0 = no signal, higher = stronger match).
+        """
+        try:
+            tree = self.store.load(doc_id)
+            searcher = TreeSearcher(tree, config=self.config)
+            return searcher.max_keyword_score(keywords)
+        except Exception:
+            return 0
+
+    def quick_score_all(
+        self,
+        doc_ids: List[str],
+        keywords: List[str],
+        max_workers: int = 8,
+    ) -> Dict[str, int]:
+        """
+        Score all candidate trees in parallel (pure local regex, no LLM).
+
+        Returns
+        -------
+        Dict mapping doc_id → score.  Missing entries default to 0.
+        """
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        scores: Dict[str, int] = {}
+        if not doc_ids or not keywords:
+            return {did: 0 for did in doc_ids}
+
+        with ThreadPoolExecutor(max_workers=min(max_workers, len(doc_ids))) as pool:
+            futures = {pool.submit(self.quick_score, did, keywords): did for did in doc_ids}
+            for future in as_completed(futures):
+                did = futures[future]
+                try:
+                    scores[did] = future.result()
+                except Exception:
+                    scores[did] = 0
+
+        return scores
+
     def hunt_parallel_with_excludes(
         self,
         doc_ids: List[str],

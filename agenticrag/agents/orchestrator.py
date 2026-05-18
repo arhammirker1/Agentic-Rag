@@ -267,8 +267,50 @@ class Orchestrator:
             f"{pre_expanded_keywords[:8]}"
         )
 
+        # ── Cross-tree pre-scoring: skip trees far below the best match ───────
+        # Score all candidate trees locally (no LLM) and drop trees whose
+        # best-node score is < 30% of the top-scoring tree.  This prevents
+        # irrelevant financial/operational sub-trees from consuming LLM tokens
+        # when one tree already has a strong structural match.
+        if len(doc_ids) > 1 and pre_expanded_keywords:
+            self._log("Quick-scoring candidate trees (local, no LLM) ...")
+            tree_scores = self.hunter.quick_score_all(doc_ids, pre_expanded_keywords)
+            max_tree_score = max(tree_scores.values()) if tree_scores else 0
+
+            # Only prune when we have a strong signal (>= PHRASE_BONUS threshold).
+            # Below that everything is weak and we should search broadly.
+            _PHRASE_BONUS = 50  # mirrors TreeSearcher._PHRASE_BONUS
+            if max_tree_score >= _PHRASE_BONUS:
+                cliff = max_tree_score * 0.30
+                pruned_ids = [did for did in doc_ids if tree_scores.get(did, 0) >= cliff]
+                dropped = [did for did in doc_ids if did not in pruned_ids]
+                if pruned_ids:
+                    doc_ids = pruned_ids
+                    if dropped:
+                        self._log(
+                            f"Tree pre-filter: keeping {len(doc_ids)} trees "
+                            f"(dropped {len(dropped)} low-signal trees, "
+                            f"max_score={max_tree_score}, cliff={cliff:.0f})."
+                        )
+                        trace.append(
+                            f"[TreeFilter] Scores: {tree_scores}. "
+                            f"Dropped {len(dropped)} trees below cliff={cliff:.0f}. "
+                            f"Hunting: {doc_ids}"
+                        )
+                    else:
+                        trace.append(
+                            f"[TreeFilter] All {len(doc_ids)} trees pass "
+                            f"(max_score={max_tree_score}, cliff={cliff:.0f})."
+                        )
+                # else: all trees dropped somehow — safety fallback, hunt original list
+            else:
+                trace.append(
+                    f"[TreeFilter] Weak signal (max_score={max_tree_score} < {_PHRASE_BONUS}), "
+                    f"searching all {len(doc_ids)} trees broadly."
+                )
+
         for rnd in range(1, max_rounds + 1):
-            # ── Hunt ─────────────────────────────────────────────────────
+            # ── Hunt ─────────────────────────────────────────────────────────
             is_parallel = getattr(self.config, 'parallel_hunting', True)
             mode_str = "in parallel" if is_parallel else "sequentially"
             

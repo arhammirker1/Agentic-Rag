@@ -172,7 +172,7 @@ class SynthesizerAgent:
             # token budget impact is acceptable.
             if self.table_parsing_mode and self._contains_table(text):
                 pass  # preserve the complete table
-            elif len(text) > self.max_chunk_size:
+            elif self.max_chunk_size is not None and len(text) > self.max_chunk_size:
                 text = text[:self.max_chunk_size] + " …[truncated]"
 
             header = f"[Chunk {i}] Document: \"{doc_title}\""
@@ -185,7 +185,7 @@ class SynthesizerAgent:
         evidence = "\n\n---\n\n".join(evidence_parts)
 
         # Cap total evidence length
-        if len(evidence) > self.max_evidence_size:
+        if self.max_evidence_size is not None and len(evidence) > self.max_evidence_size:
             evidence = evidence[:self.max_evidence_size] + "\n\n…[evidence truncated]"
 
         # Format history
