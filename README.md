@@ -80,6 +80,20 @@ print(result.text)
 
 **That's the entire setup.** Three lines of real code. No vector DB to configure, no embeddings to generate, no chunks to tune.
 
+### Or: Run the Web UI (Zero Coding!)
+
+If you prefer a beautiful, browser-based chat interface over writing Python scripts, you can spin up the Web UI directly:
+
+```bash
+# 1. Install with Web UI dependencies
+pip install agentic-rag-core[web]
+
+# 2. Start the web server
+python -m agenticrag serve
+```
+
+Open **`http://localhost:8000`** in your browser to start uploading PDFs and chatting!
+
 ---
 
 ## Use AgenticRAG in Your Own Project
