@@ -68,7 +68,6 @@ class SQLiteGraph(DocumentGraph):
             CREATE INDEX IF NOT EXISTS idx_topics ON documents(topics);
             CREATE INDEX IF NOT EXISTS idx_edges_source ON edges(source_id);
             CREATE INDEX IF NOT EXISTS idx_edges_target ON edges(target_id);
-            CREATE INDEX IF NOT EXISTS idx_parent ON documents(parent_doc_id);
         """)
         # Enable FTS5 for full-text search (built into SQLite)
         self._conn.execute("""
@@ -82,6 +81,8 @@ class SQLiteGraph(DocumentGraph):
 
         # Auto-migration: add parent_doc_id column if upgrading from older schema
         self._migrate()
+        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_parent ON documents(parent_doc_id)")
+        self._conn.commit()
 
     def _rebuild_fts(self) -> None:
         """Rebuild the FTS index after inserts/updates."""

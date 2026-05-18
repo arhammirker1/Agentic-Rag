@@ -63,8 +63,8 @@ def _run_serve(host: str, port: int):
     import importlib.util
     from pathlib import Path
 
-    # Try to find server.py relative to the package
-    server_path = Path(__file__).parent.parent / "server.py"
+    # Find server.py inside the package folder
+    server_path = Path(__file__).parent / "server.py"
     if not server_path.exists():
         # Fallback: try current working directory
         server_path = Path.cwd() / "server.py"

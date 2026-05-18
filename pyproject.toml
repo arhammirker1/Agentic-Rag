@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agentic-rag-core"
-version = "2.1.0"
+version = "2.1.1"
 description = "Vectorless, Reasoning-based RAG — multi-document agentic retrieval with zero hallucination"
 authors = [
     { name = "Arham Mirkar", email = "arhammirker1@gmail.com" }
@@ -76,3 +76,6 @@ Issues = "https://github.com/AjayVirkar/agenticrag/issues"
 
 [tool.setuptools.packages.find]
 include = ["agenticrag*"]
+
+[tool.setuptools.package-data]
+agenticrag = ["web/**/*", "web/*", "server.py"]

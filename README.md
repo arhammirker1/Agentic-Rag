@@ -457,11 +457,14 @@ forest.clear_history()
 AgenticRAG includes a beautiful web interface for chatting with your documents:
 
 ```bash
-# Install web dependencies (if not already)
+# 1. Install the library with web UI dependencies
 pip install agentic-rag-core[web]
 
-# Start the server
-python server.py
+# 2. Start the web UI server
+python -m agenticrag serve
+
+# 3. Start on a custom port
+python -m agenticrag serve --port 9000
 ```
 
 This opens a web app at **http://localhost:8000** where you can:
@@ -469,16 +472,8 @@ This opens a web app at **http://localhost:8000** where you can:
 - Create **notebooks** to organize your documents
 - Upload **PDFs** via drag-and-drop
 - **Chat** with your documents (with source citations)
-- Switch between **Groq Cloud** and **local LLM** providers
+- Switch between **Groq Cloud**, **Gemini**, and **local LLM** providers
 - Share over **LAN** — anyone on your network can access it
-
-```bash
-# Custom port
-python server.py --port 9000
-
-# Or use the module command
-python -m agenticrag serve --port 9000
-```
 
 ### Split Architecture (GPU on one machine, UI on another)
 
@@ -487,8 +482,8 @@ python -m agenticrag serve --port 9000
 set OLLAMA_HOST=0.0.0.0
 ollama serve
 
-# Machine B (laptop): Point AgenticRAG to Machine A
-python server.py
+# Machine B (laptop): Start UI and point AgenticRAG to Machine A
+python -m agenticrag serve
 # Then in Settings > Local LLM > Base URL: http://MACHINE_A_IP:11434/v1
 ```
 
