@@ -87,6 +87,9 @@ class SynthesizerAgent:
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
         max_output_tokens: int = 4096,
+        max_chunk_size: int = 2000,
+        max_evidence_size: int = 24000,
+        table_parsing_mode: bool = True,
         quiet: bool = False,
         enable_thinking: bool = False,
         num_ctx: int = 32768,
@@ -95,9 +98,32 @@ class SynthesizerAgent:
         self.api_key = api_key
         self.base_url = base_url
         self.max_output_tokens = max_output_tokens
+        self.max_chunk_size = max_chunk_size
+        self.max_evidence_size = max_evidence_size
+        self.table_parsing_mode = table_parsing_mode
         self.quiet = quiet
         self.enable_thinking = enable_thinking
         self.num_ctx = num_ctx
+
+    @staticmethod
+    def _contains_table(text: str) -> bool:
+        """
+        Return True when *text* contains at least one Markdown table.
+
+        Detection heuristic:
+          1. Count lines that contain the pipe character (|) — need ≥ 2.
+          2. At least one of those lines must match a separator row pattern
+             such as ``| --- | :--- | ---: |``.
+
+        This reliably identifies pdfplumber-extracted tables without
+        false-positives on prose that happens to contain a single pipe.
+        """
+        lines = text.splitlines()
+        pipe_lines = [ln for ln in lines if "|" in ln]
+        if len(pipe_lines) < 2:
+            return False
+        separator_re = re.compile(r"^\|?[\s\-:]+(\|[\s\-:]+)+\|?\s*$")
+        return any(separator_re.match(ln) for ln in pipe_lines)
 
     def synthesize(
         self,
@@ -137,9 +163,17 @@ class SynthesizerAgent:
             # Deduplicate repeated sentences within each chunk
             text = _deduplicate_chunk_text(text)
 
-            # Cap individual chunk length to prevent token overflow
-            if len(text) > 2000:
-                text = text[:2000] + " …[truncated]"
+            # Cap individual chunk length to prevent token overflow.
+            # Exception: when table_parsing_mode is active and the chunk
+            # contains a Markdown table we send the full text so that no
+            # rows are silently dropped (e.g. executive officer lists,
+            # financial schedules).  The keyword pre-filter already
+            # narrows the evidence set to a handful of nodes, so the
+            # token budget impact is acceptable.
+            if self.table_parsing_mode and self._contains_table(text):
+                pass  # preserve the complete table
+            elif len(text) > self.max_chunk_size:
+                text = text[:self.max_chunk_size] + " …[truncated]"
 
             header = f"[Chunk {i}] Document: \"{doc_title}\""
             if node_title:
@@ -151,8 +185,8 @@ class SynthesizerAgent:
         evidence = "\n\n---\n\n".join(evidence_parts)
 
         # Cap total evidence length
-        if len(evidence) > 24000:
-            evidence = evidence[:24000] + "\n\n…[evidence truncated]"
+        if len(evidence) > self.max_evidence_size:
+            evidence = evidence[:self.max_evidence_size] + "\n\n…[evidence truncated]"
 
         # Format history
         history_block = ""

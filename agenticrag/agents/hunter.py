@@ -71,6 +71,7 @@ class HunterAgent:
         question: str,
         history: Optional[List[Dict[str, str]]] = None,
         exclude_nodes: Optional[set] = None,
+        pre_expanded_keywords: Optional[List[str]] = None,
     ) -> HuntResult:
         """
         Search a single document's tree for the answer.
@@ -97,6 +98,7 @@ class HunterAgent:
                 question,
                 history=history,
                 pre_visited=exclude_nodes,
+                pre_expanded_keywords=pre_expanded_keywords,
             )
 
             # Package the chunks with source metadata
@@ -180,6 +182,7 @@ class HunterAgent:
         max_workers: int = 5,
         exclude_nodes: Optional[set] = None,
         parallel: bool = True,
+        pre_expanded_keywords: Optional[List[str]] = None,
     ) -> List[HuntResult]:
         """
         Search multiple documents in parallel using a thread pool.
@@ -202,7 +205,10 @@ class HunterAgent:
         if not parallel:
             for doc_id in doc_ids:
                 try:
-                    result = self.hunt(doc_id, question, history, exclude_nodes)
+                    result = self.hunt(
+                        doc_id, question, history,
+                        exclude_nodes, pre_expanded_keywords,
+                    )
                     results.append(result)
                 except Exception as e:
                     results.append(HuntResult(
@@ -214,7 +220,10 @@ class HunterAgent:
 
         with ThreadPoolExecutor(max_workers=min(max_workers, len(doc_ids))) as pool:
             futures = {
-                pool.submit(self.hunt, doc_id, question, history, exclude_nodes): doc_id
+                pool.submit(
+                    self.hunt, doc_id, question, history,
+                    exclude_nodes, pre_expanded_keywords,
+                ): doc_id
                 for doc_id in doc_ids
             }
             for future in as_completed(futures):

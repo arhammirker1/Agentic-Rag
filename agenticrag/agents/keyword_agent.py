@@ -134,7 +134,8 @@ class KeywordAgent:
                 api_key=self.api_key,
                 base_url=self.base_url,
                 temperature=0.0,
-                max_tokens=256,
+                max_tokens=1024,  # raised from 256 — the old limit caused JSON
+                                  # to be cut off mid-stream on rich keyword sets
                 quiet=self.quiet,
                 enable_thinking=self.enable_thinking,
                 num_ctx=self.num_ctx,
@@ -208,10 +209,23 @@ class KeywordAgent:
 
         Extracts candidate keywords by lowercasing, tokenising on word
         boundaries, removing common English stop-words, and keeping tokens
-        of 4+ characters.  Guarantees the pre-filter always has something
-        to work with even under complete API outage.
+        of 3+ characters.  The minimum is 3 (not 4) so that short but
+        semantically important intent words like "get" are not silently
+        dropped.  The stop-word list must never include intent-bearing
+        words such as "list", "give", "tell", "get", "find", or "show" —
+        these are critical signals that the user wants enumerated output.
         """
+        # ── Stop-words ────────────────────────────────────────────────
+        # Purely grammatical or filler words that add zero retrieval signal.
+        # DO NOT add query-intent words (list, give, tell, get, find, show).
         _STOP_WORDS = {
+            # 3-letter function words — newly reachable with the 3+ regex
+            "the", "and", "for", "not", "are", "can", "was", "has",
+            "had", "its", "who", "how", "any", "all", "but", "our",
+            "out", "may", "per", "via", "due", "one", "two", "use",
+            "yes", "ago", "did", "she", "him", "her", "his", "let",
+            "nor", "off", "own", "set", "too", "yet",
+            # 4+-letter function words (unchanged from original)
             "this", "that", "with", "from", "have", "will", "been",
             "they", "their", "there", "what", "which", "when", "where",
             "about", "would", "could", "should", "into", "over", "then",
@@ -219,5 +233,6 @@ class KeywordAgent:
             "does", "just", "like", "very", "only", "such", "both",
             "these", "those", "them", "being",
         }
-        tokens = re.findall(r"[a-z]{4,}", question.lower())
+        # 3+ chars so short intent words ("get", "set") are captured
+        tokens = re.findall(r"[a-z]{3,}", question.lower())
         return [t for t in dict.fromkeys(tokens) if t not in _STOP_WORDS]

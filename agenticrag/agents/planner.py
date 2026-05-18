@@ -164,12 +164,17 @@ class PlannerAgent:
                 candidates[doc.doc_id] = doc
 
         if not candidates:
-            # Fallback: return all documents up to max_docs
-            all_docs = self.graph.list_documents()[:self.max_docs]
+            # Fallback: return all searchable documents up to max_docs.
+            # MUST exclude parent-only grouping nodes — they have no stored
+            # tree and will cause "Tree not found" errors in the hunter.
+            all_docs = self.graph.list_documents()
+            parent_ids = {d.parent_doc_id for d in all_docs if d.parent_doc_id}
+            searchable_all = [d for d in all_docs if d.doc_id not in parent_ids]
+            top = searchable_all[:self.max_docs]
             return PlanResult(
-                doc_ids=[d.doc_id for d in all_docs],
+                doc_ids=[d.doc_id for d in top],
                 reasoning="No specific matches found, searching broadly.",
-                doc_nodes=all_docs,
+                doc_nodes=top,
             )
 
         # Filter out parent-only grouping nodes (no tree stored)

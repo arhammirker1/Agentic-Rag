@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -130,6 +131,7 @@ class TreeSearcher:
         question: str,
         history: Optional[List[Dict[str, str]]] = None,
         pre_visited: Optional[set] = None,
+        pre_expanded_keywords: Optional[List[str]] = None,
     ) -> SearchResult:
         """
         Answer `question` using agentic tree search.
@@ -213,9 +215,16 @@ class TreeSearcher:
             )
 
             doc_context = self.tree.get("document_description", "")
-            expanded_kws = self._keyword_agent.expand(
-                question, history, doc_context=doc_context
-            )
+            if pre_expanded_keywords:
+                # Reuse keywords expanded once by the orchestrator.
+                # Avoids N simultaneous LLM calls (one per hunter thread)
+                # for the identical question, which burns TPM and causes
+                # rate-limit failures that cascade into fallback garbage.
+                expanded_kws = pre_expanded_keywords
+            else:
+                expanded_kws = self._keyword_agent.expand(
+                    question, history, doc_context=doc_context
+                )
             matched_ids = self._local_node_search(expanded_kws)
 
             log.info(
@@ -253,21 +262,34 @@ class TreeSearcher:
                 )
                 tree_json = json.dumps(candidate_subtree, indent=2)
             else:
-                # No keyword hits anywhere — fall back to full compact tree
-                log.warning(
+                # Zero keyword hits across this entire document tree.
+                # The document is irrelevant to this question — skip it
+                # immediately.  Sending 30+ nodes to SELECT_NODES would
+                # waste tokens, hit rate limits, and still return nothing
+                # useful.  The orchestrator will simply get zero chunks
+                # from this document, which is the correct outcome.
+                log.info(
                     f"[pre-filter] ZERO matches across {len(self._index)} nodes "
                     f"for terms: {expanded_kws[:10]}. "
-                    f"Falling back to full compact tree — check trail.log for details."
+                    f"Document skipped as irrelevant."
                 )
-                steps.append("[pre-filter] No matches — falling back to full tree")
+                steps.append(
+                    f"[pre-filter] Zero keyword matches across "
+                    f"{len(self._index)} nodes — document irrelevant, skipped."
+                )
                 trail.step(
-                    "PRE-FILTER COMPLETED (NO MATCHES)",
-                    f"Zero keyword matches found across {len(self._index)} nodes. "
-                    f"Falling back to the full compact tree.",
+                    "PRE-FILTER COMPLETED (NO MATCHES — SKIPPED)",
+                    f"Zero keyword matches across {len(self._index)} nodes. "
+                    f"Document skipped — no SELECT_NODES call made.",
                     {"searched_terms": expanded_kws},
-                    quiet=self.config.quiet
+                    quiet=self.config.quiet,
                 )
-                tree_json = json.dumps(self._compact_tree(), indent=2)
+                return SearchResult(
+                    text="",
+                    retrieved_nodes=[],
+                    reasoning_steps=steps,
+                    iterations=0,
+                )
         else:
             log.debug(
                 f"[pre-filter] SKIPPED — {len(self._index)} nodes "
@@ -491,6 +513,23 @@ class TreeSearcher:
             question=question,
             visited_block=visited_block,
         )
+
+        # Log the exact prompt sent to the LLM so future debugging is
+        # straightforward: open trail.log and search for SELECT_NODES PROMPT
+        # to see precisely what the model was shown before it chose nodes.
+        trail.step(
+            "SELECT_NODES PROMPT",
+            f"Sending node-selection prompt to LLM | question='{question}' | "
+            f"prompt_chars={len(prompt)} | visited={len(visited)} node(s)",
+            {
+                "question": question,
+                "visited_node_ids": sorted(visited),
+                "prompt_length_chars": len(prompt),
+                "prompt_preview": prompt[:1000],
+            },
+            quiet=self.config.quiet,
+        )
+
         try:
             return chat_json(
                 prompt,
@@ -511,11 +550,10 @@ class TreeSearcher:
                 if nid not in visited:
                     return {"reasoning": "fallback", "node_ids": [nid]}
             return {"reasoning": "no nodes", "node_ids": []}
-
     def _sufficient(self, question: str, gathered: str) -> bool:
         prompt = CHECK_SUFFICIENT.format(
             question=question,
-            gathered=gathered[:8_000],
+            gathered=gathered[:self.config.max_check_size],
         )
         try:
             r = chat_json(
@@ -537,7 +575,7 @@ class TreeSearcher:
     def _answer(self, question: str, context: str) -> str:
         prompt = FINAL_ANSWER.format(
             question=question,
-            context=context[:16_000],
+            context=context[:self.config.max_context_size],
         )
         try:
             return chat(

@@ -158,6 +158,9 @@ class Orchestrator:
             api_key=config.api_key,
             base_url=config.base_url,
             max_output_tokens=config.max_output_tokens,
+            max_chunk_size=config.max_chunk_size,
+            max_evidence_size=config.max_evidence_size,
+            table_parsing_mode=config.table_parsing_mode,
             quiet=config.quiet,
             enable_thinking=config.enable_thinking,
             num_ctx=config.num_ctx,
@@ -171,6 +174,15 @@ class Orchestrator:
             num_ctx=config.num_ctx,
         )
         self.evaluator = EvaluatorAgent(
+            model=config.model,
+            api_key=config.api_key,
+            base_url=config.base_url,
+            quiet=config.quiet,
+            enable_thinking=config.enable_thinking,
+            num_ctx=config.num_ctx,
+        )
+        from .keyword_agent import KeywordAgent
+        self._keyword_agent = KeywordAgent(
             model=config.model,
             api_key=config.api_key,
             base_url=config.base_url,
@@ -238,6 +250,23 @@ class Orchestrator:
         # All doc_ids from the graph for expand_docs check
         all_available_docs = [d.doc_id for d in self.graph.list_documents()]
 
+        # ── Expand keywords ONCE for all hunters and all rounds ───────────
+        # Previously, KeywordAgent was called inside TreeSearcher.answer(),
+        # meaning N hunters × M rounds = N×M simultaneous LLM calls for the
+        # same question.  This single call is shared across every hunter thread.
+        self._log("Expanding search keywords (once for all hunters) ...")
+        pre_expanded_keywords = self._keyword_agent.expand(question, history)
+        if verbose:
+            _trail_step(
+                "Orchestrator",
+                f"Pre-expanded keywords ({len(pre_expanded_keywords)}): "
+                f"{pre_expanded_keywords[:10]}",
+            )
+        trace.append(
+            f"[Keywords] Expanded to {len(pre_expanded_keywords)} terms: "
+            f"{pre_expanded_keywords[:8]}"
+        )
+
         for rnd in range(1, max_rounds + 1):
             # ── Hunt ─────────────────────────────────────────────────────
             is_parallel = getattr(self.config, 'parallel_hunting', True)
@@ -259,6 +288,7 @@ class Orchestrator:
                 max_workers=min(5, len(doc_ids)),
                 exclude_nodes=visited_nodes if visited_nodes else None,
                 parallel=getattr(self.config, 'parallel_hunting', True),
+                pre_expanded_keywords=pre_expanded_keywords,
             )
 
             # Collect new chunks

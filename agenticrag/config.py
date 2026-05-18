@@ -137,7 +137,7 @@ class PageIndexConfig:
     max_retrieval_iterations: int = 5
 
     enable_pre_filtering:    bool  = True   # Filter large trees via keyword search before LLM loop
-    pre_filter_threshold:    int   = 50     # Min node count to activate pre-filtering
+    pre_filter_threshold:    int   = 10     # Min node count to activate pre-filtering
     max_filter_candidates:   int   = 20     # Top-N matched nodes kept in candidate sub-tree
 
     temperature:             float = 0.0
@@ -150,6 +150,21 @@ class PageIndexConfig:
     num_ctx:                 int   = 32768   # Context window for local LLMs (Ollama)
                                              # KV cache spills from VRAM → RAM automatically
                                              # 32768 = ~2-4GB RAM for 4B models
+
+    # ── Dynamic context-window controls ────────────────────────────────
+    # All four limits below were previously hardcoded deep inside agents.
+    # Exposing them here lets users with large-context models (e.g.
+    # Gemini 2.5 Pro, GPT-OSS 120B) raise them without touching agent code.
+    max_chunk_size:          int   = 8000    # Max chars per evidence chunk in the
+                                             # Synthesizer.  Raise for wide-context models.
+    max_evidence_size:       int   = 64000   # Max total evidence chars sent to Synthesizer.
+    max_context_size:        int   = 64000   # Max chars passed to the final answer LLM call
+                                             # inside TreeSearcher._answer().
+    max_check_size:          int   = 32000   # Max chars used in the sufficiency-check prompt
+                                             # inside TreeSearcher._sufficient().
+    table_parsing_mode:      bool  = True    # When True, Markdown tables bypass the per-chunk
+                                             # truncation cap so no rows are silently dropped
+                                             # (e.g. executive officer lists, financial tables).
 
 
 @dataclass
