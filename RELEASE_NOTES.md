@@ -1,26 +1,6 @@
-# Release v2.1.1: Clone-Free Web UI & SQLite Schema Bugfixes
+# Release v2.1.1: Hybrid Sub-Tree Pre-Filtering & Clone-Free Web UI
 
-This release brings highly requested usability upgrades, making the Web UI entirely clone-free, and fixing a critical database migration bug for existing SQLite stores.
-
-## 🚀 Major Feature: Clone-Free Web UI
-Previously, `server.py` and the `web/` static files were kept at the repository root and excluded from PyPI packaging. Users were required to clone the GitHub repository to run the Web UI.
-
-In **v2.1.1**, the entire Web UI architecture has been integrated natively into the library package:
-- **Zero Cloning**: All UI static assets (HTML/CSS/JS) and the FastAPI server logic are now packaged within the library wheel and tarball.
-- **Global Serve Command**: Start the Web UI from anywhere on your machine with a simple one-liner:
-  ```bash
-  pip install agentic-rag-core[web]
-  python -m agenticrag serve
-  ```
-
-## 🐛 Bug Fixes
-- **SQLite Database Auto-Migration Fix**: Resolved a critical SQLite schema bug (`sqlite3.OperationalError: no such column: parent_doc_id`) that caused crashes on existing databases when upgrading. The `CREATE INDEX` for `parent_doc_id` is now safely deferred until the `_migrate()` auto-schema migration finishes, ensuring older databases are seamlessly upgraded without data loss.
-
----
-
-# Release v2.1.0: Hybrid Sub-Tree Pre-Filtering
-
-This release introduces a massive architectural optimization for handling large documents (like SEC 10-K filings and extensive manuals): **Hybrid Sub-Tree Pre-Filtering**.
+This release introduces a massive architectural optimization for handling large documents (like SEC 10-K filings and extensive manuals): **Hybrid Sub-Tree Pre-Filtering**, alongside a completely rewritten **Clone-Free Web UI** distribution and a database schema migration bugfix.
 
 ## 🚀 Major Feature: Hybrid Sub-Tree Filtering
 Previously, AgenticRAG passed the entire document tree to the LLM during the `SELECT_NODES` phase. For large documents with hundreds of nodes, this caused extreme token bloat (up to 25,000+ tokens per call), triggering rate limits and causing the LLM to miss relevant nodes ("needle in a haystack" problem).
@@ -38,8 +18,19 @@ The expanded keywords are fed into a fast, local Python regex scorer (`_local_no
 ### 3. Compact Candidate Sub-Trees
 The system takes the highest-scoring nodes and rebuilds a "compact sub-tree" that preserves the parent-child relationships. Instead of sending an 800-node tree to the LLM, the Hunter agent now receives a highly targeted 15-node tree, retaining the hierarchical context but eliminating the noise.
 
+## 🎨 Clone-Free Web UI & SQLite Migration Fix
+You can now run the premium web interface directly from the PyPI library without needing to clone the GitHub repository! We have restructured and packaged all the server and frontend assets right inside the core library.
+
+- **Internal Packaging**: The FastAPI `server.py` and the complete static `web/` assets are now fully bundled in the python wheel package.
+- **SQLite Schema Auto-Migration Fix**: Solved the `sqlite3.OperationalError: no such column: parent_doc_id` database upgrade issue. SQLite indexes are now cleanly generated *after* column auto-migration runs, ensuring users with older version databases upgrade automatically and painlessly.
+- **Easy CLI Command**: Spin up the Web UI from any directory on your computer:
+  ```bash
+  pip install agentic-rag-core[web] --upgrade
+  python -m agenticrag serve
+  ```
+
 ## 🛠️ Command to Update
-Users can upgrade to the latest version by running:
+Users can upgrade to this version by running:
 ```bash
 pip install agentic-rag-core[web] --upgrade
 ```
