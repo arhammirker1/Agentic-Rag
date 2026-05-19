@@ -12,7 +12,7 @@
   <a href="#quick-start-30-seconds">Quick Start</a> &nbsp;&middot;&nbsp;
   <a href="#web-ui">Web UI</a> &nbsp;&middot;&nbsp;
   <a href="#api-reference">API Reference</a> &nbsp;&middot;&nbsp;
-  <a href="#supported-models">Models</a>
+  <a href="#supported-models">Models</a> &nbsp;&middot;&nbsp;
   <a href="https://github.com/arhammirker1/Agentic-Rag/blob/main/benchmarks/results/single_test_20260519_230251.md">BenchMarks</a>
 </p>
 
